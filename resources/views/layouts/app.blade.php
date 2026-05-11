@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
 </head>
 
-<body>
+<body class="d-flex flex-column min-vh-100 bg-light">
 
     <nav class="navbar navbar-dark bg-dark">
         <div class="container-fluid d-flex align-items-center justify-content-between responsive-container">
@@ -47,10 +47,28 @@
 
     <x-sidebar />
 
-    <div class="@yield('container_class', 'container-fluid') mt-5 responsive-container">
+    <div class="@yield('container_class', 'container-fluid') mt-5 responsive-container flex-grow-1">
 
         @yield('content')
     </div>
+
+    <!-- Professional Footer -->
+    <footer class="bg-dark text-white py-4 mt-5">
+        <div class="container-fluid responsive-container">
+            <div class="row align-items-center">
+                <div class="col-md-6 text-center text-md-start mb-3 mb-md-0">
+                    <h6 class="mb-1 fw-bold">PANTAWID AFS-IS</h6>
+                    <p class="small text-white-50 mb-0">Admin Facilitation Section - Information System</p>
+                </div>
+                <div class="col-md-6 text-center text-md-end">
+                    <p class="small text-white-50 mb-0">
+                        &copy; {{ date('Y') }} Department of Social Welfare and Development. <br class="d-md-none">All
+                        rights reserved.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
 
     <!-- Loader -->
     <style>

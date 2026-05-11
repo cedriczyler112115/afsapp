@@ -57,6 +57,17 @@ class LoginController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => ['required', 'email'],
             'password' => ['required'],
+            'g-recaptcha-response' => ['required', function ($attribute, $value, $fail) {
+                $response = \Illuminate\Support\Facades\Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
+                    'secret' => env('RECAPTCHA_SECRET_KEY', '6LfUfeQsAAAAABKisP9pT5bAO7xEA-epi5Jl_6JS'),
+                    'response' => $value,
+                ]);
+                if (! $response->json('success')) {
+                    $fail('The reCAPTCHA verification failed. Please try again.');
+                }
+            }],
+        ], [
+            'g-recaptcha-response.required' => 'Please complete the reCAPTCHA verification.',
         ]);
 
         if ($validator->fails()) {
@@ -68,7 +79,10 @@ class LoginController extends Controller
         $credentials = $validator->validated();
         $remember = $request->has('remember');
 
-        $loginCredentials = $credentials;
+        $loginCredentials = [
+            'email' => $credentials['email'],
+            'password' => $credentials['password'],
+        ];
         if (Schema::hasColumn('users', 'is_status')) {
             $loginCredentials['is_status'] = 1;
         }

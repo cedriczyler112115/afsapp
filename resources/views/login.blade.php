@@ -7,6 +7,7 @@
     <title>Login - Stock Inventory Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     <style>
         :root {
             --auth-bg-1: #0b1220;
@@ -394,6 +395,13 @@
                             </div>
                             <a href="{{ route('password.request') }}" class="text-decoration-none text-secondary small">Forgot password?</a>
                         </div>
+
+                        <div class="mb-3 d-flex justify-content-left">
+                            <div class="g-recaptcha" data-sitekey="{{ env('RECAPTCHA_SITE_KEY', '6LfUfeQsAAAAAPPT83uS5W3hCmZryD_qB5gqStLv') }}"></div>
+                        </div>
+                        @error('g-recaptcha-response', 'login')
+                            <div class="text-danger small mb-3 text-center">{{ $message }}</div>
+                        @enderror
 
                         <button class="btn btn-auth btn-auth-primary w-100" type="submit">Log in</button>
 
