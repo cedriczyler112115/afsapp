@@ -76,10 +76,46 @@
             50% { content: '..'; }
             75% { content: '...'; }
         }
+
+        /* Custom Loader Logo & Spinner */
+        .custom-loader-wrapper {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loader-logo {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            z-index: 2;
+        }
+
+        .loader-spinner {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 5px solid rgba(255, 255, 255, 0.2);
+            border-top: 5px solid #ffffff;
+            border-radius: 50%;
+            animation: loader-spin 1s linear infinite;
+            z-index: 1;
+        }
+
+        @keyframes loader-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
-    <div id="loader" class="d-none position-fixed top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center" style="background: rgba(0, 0, 0, 0.6); z-index: 9999;">
-        <div class="spinner-border text-light mb-3" role="status" style="width: 3rem; height: 3rem;">
-            <span class="visually-hidden">Loading...</span>
+    <div id="loader" class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center" style="background: rgba(0, 0, 0, 0.6); z-index: 9999;">
+        <div class="custom-loader-wrapper mb-3">
+            <img src="{{ asset('storage/4ps-logo.png') }}" alt="4Ps Logo" class="loader-logo">
+            <div class="loader-spinner"></div>
         </div>
         <div class="text-white fw-bold fs-5">
             Loading<span class="loading-dots"></span>
@@ -125,12 +161,60 @@
                 @endforeach
             @endif
 
-            // Global Loader Handler
-            $(document).ajaxStart(function() {
+            // Global Loader Handler (jQuery AJAX & Page Transitions)
+            let activeRequests = 0;
+
+            if (document.readyState === 'complete') {
+                if (activeRequests === 0) $('#loader').addClass('d-none');
+            } else {
+                $(window).on('load', function() {
+                    if (activeRequests === 0) $('#loader').addClass('d-none');
+                });
+            }
+
+            $(window).on('beforeunload', function() {
                 $('#loader').removeClass('d-none');
-            }).ajaxStop(function() {
-                $('#loader').addClass('d-none');
             });
+
+            window.addEventListener('pageshow', function(event) {
+                if (event.persisted && activeRequests === 0) {
+                    $('#loader').addClass('d-none');
+                }
+            });
+
+            function showLoader() {
+                if (activeRequests === 0) {
+                    $('#loader').removeClass('d-none');
+                }
+                activeRequests++;
+            }
+
+            function hideLoader() {
+                activeRequests--;
+                if (activeRequests <= 0) {
+                    activeRequests = 0;
+                    $('#loader').addClass('d-none');
+                }
+            }
+
+            $(document).ajaxStart(function() {
+                showLoader();
+            }).ajaxStop(function() {
+                hideLoader();
+            });
+
+            // Global Loader Handler (Fetch API)
+            const originalFetch = window.fetch;
+            window.fetch = function() {
+                showLoader();
+                return originalFetch.apply(this, arguments).then(function(response) {
+                    hideLoader();
+                    return response;
+                }).catch(function(error) {
+                    hideLoader();
+                    throw error;
+                });
+            };
         });
     </script>
     @stack('scripts')
