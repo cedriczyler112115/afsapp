@@ -60,9 +60,11 @@
                                 <select name="level_id" class="form-select" required>
                                     <option value="">Select Level</option>
                                     @foreach($userLevels as $lvl)
-                                        <option value="{{ $lvl->level_id }}" {{ old('level_id', $user->level_id) == $lvl->level_id ? 'selected' : '' }}>
-                                            {{ $lvl->level_name }}
-                                        </option>
+                                        @if($lvl->level_name !== 'Administrator')
+                                            <option value="{{ $lvl->level_id }}" {{ old('level_id', $user->level_id) == $lvl->level_id ? 'selected' : '' }}>
+                                                {{ $lvl->level_name }}
+                                            </option>
+                                        @endif
                                     @endforeach
                                 </select>
                             </div>
