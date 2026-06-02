@@ -320,7 +320,7 @@
                 </div>
                 <div>
                     <p class="auth-title">4Ps AFS-IS</p>
-                    <p class="auth-subtitle">4Ps Administration and Finance Section Information System</p>
+                    <p class="auth-subtitle">4Ps Admin Portal</p>
                 </div>
             </div>
             <div class="auth-actions">
