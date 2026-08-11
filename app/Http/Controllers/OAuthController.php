@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use GuzzleHttp\Exception\ClientException;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
 
@@ -194,22 +195,30 @@ class OAuthController extends Controller
 
         } catch (\Throwable $e) {
             $reference = Str::upper(Str::random(8));
+            $googleError = $this->extractGoogleOAuthError($e);
 
             Log::error('Google OAuth callback failed', [
                 'reference' => $reference,
                 'exception' => $e::class,
                 'message' => $e->getMessage(),
+                'google_error' => $googleError,
                 'redirect_uri' => config('services.google.redirect'),
                 'request_url' => $request->fullUrlWithoutQuery(['code']),
             ]);
 
             $message = match (true) {
                 $e instanceof InvalidStateException => 'Google login session expired or could not be verified. Please try again.',
+                $googleError === 'redirect_uri_mismatch' => 'Google rejected the callback URL. Please verify the authorized redirect URI in Google Cloud Console and clear the config cache on Hostinger.',
+                $googleError === 'invalid_client' => 'Google rejected the client credentials on the server. Please verify the Google Client ID and Secret on Hostinger.',
+                $googleError === 'invalid_grant' => 'Google login code expired or became invalid. Please try again after clearing browser cookies and config cache.',
+                $googleError === 'access_denied' => 'Google login was cancelled or access was denied.',
                 str_contains(strtolower($e->getMessage()), 'access_denied') => 'Google login was cancelled or access was denied.',
                 str_contains(strtolower($e->getMessage()), 'google oauth database migrations')
                     || str_contains(strtolower($e->getMessage()), 'unknown column')
                     || str_contains(strtolower($e->getMessage()), 'base table or view not found') => 'Google login database setup is incomplete. Please run the server migrations.',
-                default => "Unable to authenticate with Google. Error reference: {$reference}",
+                default => $googleError
+                    ? "Unable to authenticate with Google ({$googleError}). Error reference: {$reference}"
+                    : "Unable to authenticate with Google. Error reference: {$reference}",
             };
 
             return redirect()->route('login')->withErrors(['email' => $message], 'login');
@@ -245,5 +254,35 @@ class OAuthController extends Controller
     private function googleRedirectUrl(Request $request): string
     {
         return (string) config('services.google.redirect');
+    }
+
+    private function extractGoogleOAuthError(\Throwable $e): ?string
+    {
+        if ($e instanceof ClientException) {
+            $response = $e->getResponse();
+            if ($response) {
+                $body = (string) $response->getBody();
+                if ($body !== '') {
+                    $decoded = json_decode($body, true);
+                    if (is_array($decoded) && isset($decoded['error'])) {
+                        return strtolower((string) $decoded['error']);
+                    }
+
+                    if (preg_match('/"error"\s*:\s*"([^"]+)"/i', $body, $matches)) {
+                        return strtolower($matches[1]);
+                    }
+                }
+            }
+        }
+
+        $message = strtolower($e->getMessage());
+
+        foreach (['redirect_uri_mismatch', 'invalid_client', 'invalid_grant', 'access_denied'] as $needle) {
+            if (str_contains($message, $needle)) {
+                return $needle;
+            }
+        }
+
+        return null;
     }
 }
