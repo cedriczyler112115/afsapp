@@ -6,9 +6,11 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\InvalidStateException;
 
 class OAuthController extends Controller
 {
@@ -26,11 +28,21 @@ class OAuthController extends Controller
         if ($authKey) {
             session(['desktop_auth_key' => $authKey]);
             return Socialite::driver('google')
+                ->stateless()
                 ->with(['state' => 'desktop_' . $authKey])
                 ->redirect();
         }
 
-        return Socialite::driver('google')->redirect();
+        $state = Crypt::encryptString(json_encode([
+            'type' => 'web',
+            'nonce' => Str::random(40),
+            'issued_at' => now()->timestamp,
+        ], JSON_THROW_ON_ERROR));
+
+        return Socialite::driver('google')
+            ->stateless()
+            ->with(['state' => 'web_'.$state])
+            ->redirect();
     }
 
     public function handleGoogleCallback(Request $request)
@@ -43,19 +55,34 @@ class OAuthController extends Controller
             if ($state && strpos($state, 'desktop_') === 0) {
                 $isDesktop = true;
                 $desktopAuthKey = substr($state, 8);
+            } elseif ($state && str_starts_with($state, 'web_')) {
+                $statePayload = json_decode(
+                    Crypt::decryptString(substr($state, 4)),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+
+                $issuedAt = (int) ($statePayload['issued_at'] ?? 0);
+                $isValidWebState = ($statePayload['type'] ?? null) === 'web'
+                    && is_string($statePayload['nonce'] ?? null)
+                    && strlen($statePayload['nonce']) >= 32
+                    && $issuedAt > 0
+                    && abs(now()->timestamp - $issuedAt) <= 600;
+
+                if (! $isValidWebState) {
+                    throw new InvalidStateException('Google login state is invalid or expired.');
+                }
             } else {
                 $desktopAuthKey = session('desktop_auth_key');
                 if ($desktopAuthKey) {
                     $isDesktop = true;
+                } else {
+                    throw new InvalidStateException('Google login state is missing.');
                 }
             }
 
-            $driver = Socialite::driver('google');
-            if ($isDesktop) {
-                $driver = $driver->stateless();
-            }
-
-            $googleUser = $driver->user();
+            $googleUser = Socialite::driver('google')->stateless()->user();
 
             // First try to find the user by their Google ID
             $user = User::where('google_id', $googleUser->getId())->first();
@@ -151,7 +178,7 @@ class OAuthController extends Controller
             ]);
 
             $message = match (true) {
-                str_contains(strtolower($e->getMessage()), 'invalid_state') => 'Google login session expired or could not be verified. Please try again.',
+                $e instanceof InvalidStateException => 'Google login session expired or could not be verified. Please try again.',
                 str_contains(strtolower($e->getMessage()), 'access_denied') => 'Google login was cancelled or access was denied.',
                 default => "Unable to authenticate with Google. Error reference: {$reference}",
             };
