@@ -6,6 +6,14 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span>Stock Out (Issuance)</span>
+        <div class="d-flex gap-2">
+            <a href="{{ route('supply-requests.index', ['status' => 'READY']) }}" class="btn btn-outline-primary btn-sm text-nowrap">
+                <i class="bi bi-clipboard-check me-1"></i>Approved Requests
+            </a>
+            <a href="{{ route('stock-out.create') }}" class="btn btn-primary btn-sm text-nowrap">
+                <i class="bi bi-plus-circle me-1"></i>Issue Stock
+            </a>
+        </div>
     </div>
     <div class="card-body p-2 p-md-3">
         <div class="row g-2 mb-3 align-items-end">
@@ -61,10 +69,6 @@
                         </select>
                     </div>
 
-                    <a href="{{ route('stock-out.create') }}" class="btn btn-primary btn-sm text-nowrap">
-                        <i class="bi bi-plus-circle me-1"></i>Issue Stock
-                    </a>
-                    
                     <button type="button" id="print-issuances" class="btn btn-sm btn-success text-nowrap" disabled title="Print Selected">
                         <i class="bi bi-printer me-1"></i>Print
                     </button>

@@ -259,20 +259,43 @@
                     <th style="width: 25%">Item Name</th>
                     <th style="width: 20%">Serial/Code</th>
                     <th style="width: 15%">Category</th>
+                    <th style="width: 10%">Issue By</th>
+                    <th style="width: 10%">PC/S</th>
                     <th style="width: 15%">Date Released</th>
                 </tr>
             </thead>
             <tbody>
-                @php $counter = 1; @endphp
-                @foreach($group->issuances as $issuance)
-                    @foreach($issuance->itemUnits as $unit)
-                    <tr>
-                        <td style="text-align: center;">{{ $counter++ }}</td>
-                        <td>{{ $unit->item->item_name }}</td>
-                        <td>{{ $unit->serial ?? $unit->full_code }}</td>
-                        <td>{{ $unit->item->category->category_name ?? '-' }}</td>
-                        <td style="text-align: center;">{{ $issuance->date_issued->format('Y-m-d') }}</td>
-                    </tr>
+                @php
+                    $counter = 1;
+                    $transactionsBySerialCode = $group->issuances
+                        ->flatMap(function ($issuance) {
+                            return $issuance->stockTransactions->map(function ($transaction) use ($issuance) {
+                                return ['issuance' => $issuance, 'transaction' => $transaction];
+                            });
+                        })
+                        ->groupBy(function ($row) {
+                            return $row['transaction']->unit->serial
+                                ?? $row['transaction']->unit->full_code
+                                ?? '-';
+                        });
+                @endphp
+                @foreach($transactionsBySerialCode as $serialCode => $rows)
+                    @foreach($rows as $row)
+                        @php
+                            $issuance = $row['issuance'];
+                            $transaction = $row['transaction'];
+                        @endphp
+                        <tr>
+                            <td style="text-align: center;">{{ $counter++ }}</td>
+                            <td>{{ $transaction->unit->item->item_name }}</td>
+                            @if($loop->first)
+                                <td rowspan="{{ $rows->count() }}" style="vertical-align: middle; text-align: center;">{{ $serialCode }}</td>
+                            @endif
+                            <td>{{ $transaction->unit->item->category->category_name ?? '-' }}</td>
+                            <td style="text-align: center;">{{ ($transaction->issue_mode ?? 'BOX') === 'BOX' ? 'Box' : 'PC/S' }}</td>
+                            <td style="text-align: center;">{{ number_format($transaction->quantity) }}</td>
+                            <td style="text-align: center;">{{ $issuance->date_issued->format('Y-m-d') }}</td>
+                        </tr>
                     @endforeach
                 @endforeach
             </tbody>

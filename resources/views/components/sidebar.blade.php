@@ -105,6 +105,24 @@
     font-weight: 600;
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   }
+  .supply-request-badge {
+    margin-left: auto;
+    min-width: 1.25rem;
+    text-align: center;
+  }
+  @media (min-width: 768px) {
+    #sidebar-container.collapsed .supply-request-link {
+      position: relative;
+    }
+    #sidebar-container.collapsed .supply-request-badge {
+      position: absolute;
+      top: -0.1rem;
+      right: 0.15rem;
+      min-width: 1rem;
+      padding: 0.05rem 0.25rem !important;
+      font-size: 0.6rem !important;
+    }
+  }
 </style>
 
 <aside id="sidebar-container" class="bg-slate-950 text-slate-200 flex flex-col h-screen z-40 sticky top-0 overflow-hidden">
@@ -112,7 +130,7 @@
   <div class="h-12 border-b border-slate-800 flex items-center justify-between px-3 flex-shrink-0">
     <div class="flex items-center gap-2 overflow-hidden">
       <img src="{{ asset('storage/4ps-logo.png') }}" alt="4Ps Logo" style="width: 24px; height: 24px;" class="flex-shrink-0">
-      <span class="sidebar-header-title font-semibold text-sm tracking-wider text-white whitespace-nowrap">PANTAWID AFS</span>
+      <span class="sidebar-header-title font-semibold text-sm tracking-wider text-white whitespace-nowrap">4PS-AFS-IS</span>
     </div>
     <!-- Mobile close button -->
     <button class="btn btn-outline-secondary p-1 border-0 d-md-none text-slate-400 hover:text-white" type="button" id="sidebarCloseBtn" aria-label="Close Sidebar">
@@ -158,6 +176,34 @@
         <div class="sidebar-category-divider d-none"></div>
       </div>
       <div class="flex flex-col">
+        @php
+          $sidebarUser = Auth::user();
+          $canProcessSupplyRequests = (int) $sidebarUser->level_id === 1 || $sidebarUser->hasSidebarAccess('stock-out.index');
+          $pendingSupplyRequests = 0;
+          $pendingBorrowRequests = 0;
+          if (\Illuminate\Support\Facades\Schema::hasTable('supply_requests')) {
+              $pendingSupplyRequestQuery = \App\Models\SupplyRequest::where('status', 'PENDING');
+              if (! $canProcessSupplyRequests) {
+                  $pendingSupplyRequestQuery->where('requester_id', $sidebarUser->id);
+              }
+              $pendingSupplyRequests = $pendingSupplyRequestQuery->count();
+          }
+          if (\Illuminate\Support\Facades\Schema::hasTable('borrowings')) {
+              $canProcessBorrowRequests = (int) $sidebarUser->level_id === 1 || $sidebarUser->hasSidebarAccess('stock-in.index');
+              $pendingBorrowRequestQuery = \App\Models\Borrowing::where('status', 'REQUESTED');
+              if (! $canProcessBorrowRequests) {
+                  $pendingBorrowRequestQuery->where('borrower_id', $sidebarUser->id);
+              }
+              $pendingBorrowRequests = $pendingBorrowRequestQuery->count();
+          }
+        @endphp
+        <a class="nav-link-custom supply-request-link @if(request()->routeIs('supply-requests.*')) active @endif" href="{{ route('supply-requests.index') }}" title="Supply Requests{{ $pendingSupplyRequests ? ' - '.$pendingSupplyRequests.' pending' : '' }}">
+          <i class="bi bi-clipboard-check me-2"></i>
+          <span class="sidebar-text">Supplies Request</span>
+          @if($pendingSupplyRequests > 0)
+            <span class="badge bg-danger supply-request-badge" aria-label="{{ $pendingSupplyRequests }} pending supply requests">{{ $pendingSupplyRequests > 99 ? '99+' : $pendingSupplyRequests }}</span>
+          @endif
+        </a>
         @if(Auth::user()->hasSidebarAccess('stock-in.index'))
         <a class="nav-link-custom @if(request()->routeIs('stock-in.*')) active @endif" href="{{ route('stock-in.index') }}" title="Stock In (Receiving)">
           <i class="bi bi-box-arrow-in-down me-2"></i>
@@ -171,9 +217,12 @@
         </a>
         @endif
         @if(Auth::user()->hasSidebarAccess('borrowings.index'))
-        <a class="nav-link-custom @if(request()->routeIs('borrowings.*')) active @endif" href="{{ route('borrowings.index') }}" title="Borrow Item">
+        <a class="nav-link-custom supply-request-link @if(request()->routeIs('borrowings.*')) active @endif" href="{{ route('borrowings.index') }}" title="Borrow Item{{ $pendingBorrowRequests ? ' - '.$pendingBorrowRequests.' requested' : '' }}">
           <i class="bi bi-person-up me-2"></i>
           <span class="sidebar-text">Borrow Item</span>
+          @if($pendingBorrowRequests > 0)
+            <span class="badge bg-danger supply-request-badge" aria-label="{{ $pendingBorrowRequests }} requested borrow items">{{ $pendingBorrowRequests > 99 ? '99+' : $pendingBorrowRequests }}</span>
+          @endif
         </a>
         @endif
         @if(Auth::user()->hasSidebarAccess('damaged-items.index'))
@@ -220,13 +269,13 @@
         <div class="sidebar-category-divider d-none"></div>
       </div>
       <div class="flex flex-col">
-        @if(Auth::user()->hasSidebarAccess('incoming-documents.index'))
+        @if(Auth::user()->hasSidebarAccess('monthly-transactions.index') || Auth::user()->hasSidebarAccess('incoming-documents.index'))
         <a class="nav-link-custom @if(request()->routeIs('monthly-transactions.*')) active @endif" href="{{ route('monthly-transactions.index') }}" title="Monthly Transactions">
           <i class="bi bi-calendar3 me-2"></i>
           <span class="sidebar-text">Monthly Transactions</span>
         </a>
         @endif
-        @if(Auth::user()->hasSidebarAccess('tracking-dashboard.index'))
+        @if(Auth::user()->hasSidebarAccess('tracking-reports.index') || Auth::user()->hasSidebarAccess('tracking-dashboard.index'))
         <a class="nav-link-custom @if(request()->routeIs('tracking-dashboard.*') && request()->boolean('report')) active @endif" href="{{ route('tracking-dashboard.index', ['report' => 1]) }}" title="Tracking Reports">
           <i class="bi bi-repeat me-2"></i>
           <span class="sidebar-text">Tracking Reports</span>

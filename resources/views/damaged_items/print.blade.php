@@ -235,12 +235,12 @@
             <tbody>
                 @php $counter = 1; @endphp
                 @foreach($group->issuances as $issuance)
-                    @foreach($issuance->itemUnits as $unit)
+                    @foreach($issuance->damageTransactions as $damage)
                     <tr>
                         <td style="text-align: center;">{{ $counter++ }}</td>
-                        <td>{{ $unit->item->item_name }}</td>
-                        <td>{{ $unit->serial ?? $unit->full_code }}</td>
-                        <td>{{ $unit->item->category->category_name ?? '-' }}</td>
+                        <td>{{ $damage->item->item_name }}</td>
+                        <td>{{ $damage->unit->serial ?? $damage->unit->full_code ?? '-' }} ({{ $damage->issue_mode === 'PCS' ? number_format($damage->quantity).' PC/S' : 'Box' }})</td>
+                        <td>{{ $damage->item->category->category_name ?? '-' }}</td>
                         <td style="text-align: center;">{{ $issuance->date_issued->format('Y-m-d') }}</td>
                     </tr>
                     @endforeach

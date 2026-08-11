@@ -7,6 +7,7 @@
                 <th class="text-nowrap">Category</th>
                 <th class="text-nowrap">SKU</th>
                 <th class="text-nowrap">Current Qty</th>
+                <th class="text-nowrap">Remaining PC/S</th>
                 <th class="text-nowrap">Reorder Level</th>
                 <th class="text-nowrap">Action</th>
             </tr>
@@ -19,6 +20,7 @@
                 <td>{{ $transaction->category_name }}</td>
                 <td>{{ $transaction->sku }}</td>
                 <td>{{ $transaction->current_quantity }}</td>
+                <td>{{ number_format($transaction->current_pieces) }}</td>
                 <td>{{ $transaction->reorder_level }}</td>
                 <td class="text-nowrap">
                     <a href="{{ route('stock-in.edit', $transaction->item_id) }}" class="btn btn-sm btn-primary" title="Edit"><i class="bi bi-pencil-square"></i></a>
@@ -43,7 +45,8 @@
         <tfoot>
             <tr class="table-light fw-bold">
                 <td colspan="4" class="text-end">Overall Total:</td>
-                <td>{{ $overallTotalQuantity ?? 0 }}</td>
+                <td>{{ $overallTotalQuantity ?? 0 }} box(es)</td>
+                <td>{{ number_format($overallTotalPieces ?? 0) }} PC/S</td>
                 <td colspan="2"></td>
             </tr>
         </tfoot>

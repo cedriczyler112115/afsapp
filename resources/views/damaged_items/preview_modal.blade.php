@@ -21,11 +21,11 @@
                         </thead>
                         <tbody>
                             @foreach($issuances as $issuance)
-                                @foreach($issuance->itemUnits as $unit)
+                                @foreach($issuance->damageTransactions as $damage)
                                 <tr>
                                     <td>{{ $issuance->receiver_name }}</td>
-                                    <td>{{ $unit->item->item_name }}</td>
-                                    <td>{{ $unit->serial ?? $unit->full_code }}</td>
+                                    <td>{{ $damage->item->item_name }}</td>
+                                    <td>{{ $damage->unit->serial ?? $damage->unit->full_code ?? '-' }} ({{ $damage->issue_mode === 'PCS' ? number_format($damage->quantity).' PC/S' : 'Box' }})</td>
                                     <td>{{ $issuance->date_issued->format('Y-m-d') }}</td>
                                 </tr>
                                 @endforeach

@@ -78,7 +78,7 @@
                     <select class="form-select" id="unit_id" name="unit_id" required>
                         <option value="">Select Unit</option>
                         @foreach($units as $unit)
-                            <option value="{{ $unit->id }}">{{ $unit->unit_name }}</option>
+                            <option value="{{ $unit->id }}" data-unit-name="{{ $unit->unit_name }}">{{ $unit->unit_name }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -87,6 +87,10 @@
                 <div class="col-md-6 mb-3">
                     <label for="reorder_level" class="form-label">Reorder Level</label>
                     <input type="number" class="form-control" id="reorder_level" name="reorder_level" required>
+                </div>
+                <div class="col-md-6 mb-3 d-none" id="pcs_per_unit_wrapper">
+                    <label for="pcs_per_unit" class="form-label" id="pcs_per_unit_label">PC/S inside the unit</label>
+                    <input type="number" class="form-control" id="pcs_per_unit" name="pcs_per_unit" min="1" step="1">
                 </div>
             </div>
             <div class="mb-3">
@@ -122,6 +126,25 @@
             
             let toast = new bootstrap.Toast(toastEl);
             toast.show();
+        }
+
+        function syncPcsFieldVisibility() {
+            const selectedOption = $('#unit_id option:selected');
+            const unitName = (selectedOption.data('unit-name') || selectedOption.text() || '').toString().trim();
+            const isBox = unitName.toLowerCase() === 'box';
+            const wrapper = $('#pcs_per_unit_wrapper');
+            const input = $('#pcs_per_unit');
+            const label = $('#pcs_per_unit_label');
+
+            if (isBox) {
+                label.text(`PC/S inside the ${unitName}`);
+                wrapper.removeClass('d-none');
+                input.prop('required', true);
+            } else {
+                label.text('PC/S inside the unit');
+                wrapper.addClass('d-none');
+                input.prop('required', false).val('');
+            }
         }
 
         // Fetch Items
@@ -162,6 +185,8 @@
             fetchItems(1);
         });
 
+        $('#unit_id').on('change', syncPcsFieldVisibility);
+
         // Pagination Click
         $(document).on('click', '.pagination a', function(e) {
             e.preventDefault();
@@ -178,6 +203,7 @@
             $('#itemForm')[0].reset();
             $('#item_id').val('');
             $('#itemModalLabel').text('Create Item');
+            syncPcsFieldVisibility();
             $('#itemModal').modal('show');
         });
 
@@ -195,7 +221,9 @@
                     $('#category_id').val(data.category_id);
                     $('#unit_id').val(data.unit_id);
                     $('#reorder_level').val(data.reorder_level);
+                    $('#pcs_per_unit').val(data.pcs_per_unit);
                     $('#description').val(data.description);
+                    syncPcsFieldVisibility();
                     $('#itemModal').modal('show');
                 },
                 error: function(xhr) {
@@ -269,6 +297,8 @@
                 }
             });
         });
+
+        syncPcsFieldVisibility();
     });
 </script>
 @endpush

@@ -16,16 +16,20 @@
                                 <th>Receiver</th>
                                 <th>Item</th>
                                 <th>Serial/Code</th>
+                                <th>Issue By</th>
+                                <th>PC/S</th>
                                 <th>Date Released</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($issuances as $issuance)
-                                @foreach($issuance->itemUnits as $unit)
+                                @foreach($issuance->stockTransactions as $transaction)
                                 <tr>
                                     <td>{{ $issuance->receiver_name }}</td>
-                                    <td>{{ $unit->item->item_name }}</td>
-                                    <td>{{ $unit->serial ?? $unit->full_code }}</td>
+                                    <td>{{ $transaction->unit->item->item_name }}</td>
+                                    <td>{{ $transaction->unit->serial ?? $transaction->unit->full_code }}</td>
+                                    <td>{{ ($transaction->issue_mode ?? 'BOX') === 'BOX' ? 'Box' : 'PC/S' }}</td>
+                                    <td>{{ number_format($transaction->quantity) }}</td>
                                     <td>{{ $issuance->date_issued->format('Y-m-d') }}</td>
                                 </tr>
                                 @endforeach

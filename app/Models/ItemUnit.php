@@ -11,6 +11,7 @@ class ItemUnit extends Model
         'serial',
         'full_code',
         'qr_code',
+        'pcs_per_unit',
         'status',
         'date_created',
         'created_by',

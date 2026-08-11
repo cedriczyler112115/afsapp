@@ -17,6 +17,7 @@ class Item extends Model
         'sku',
         'description',
         'unit_id',
+        'pcs_per_unit',
         'current_quantity',
         'reorder_level',
         'create_by',
@@ -47,5 +48,15 @@ class Item extends Model
     public function returns()
     {
         return $this->hasMany(ItemReturn::class, 'item_id', 'item_id');
+    }
+
+    public function itemUnits()
+    {
+        return $this->hasMany(ItemUnit::class, 'item_id', 'item_id');
+    }
+
+    public function supplyRequestItems()
+    {
+        return $this->hasMany(SupplyRequestItem::class, 'item_id', 'item_id');
     }
 }

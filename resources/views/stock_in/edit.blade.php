@@ -66,9 +66,9 @@
         </form>
 
         <!-- Item Info (Read-only) -->
-        <div class="card mb-4 border-0 shadow-sm">
-            <div class="card-header bg-light py-2">
-                <h6 class="mb-0 text-secondary fw-bold"><i class="bi bi-info-circle me-2"></i>Item Information</h6>
+        <div class="card mb-4 border-0 shadow-sm stock-item-info-card">
+            <div class="card-header bg-light py-2 stock-item-info-header">
+                <h6 class="mb-0 text-secondary fw-semibold stock-item-info-title"><i class="bi bi-info-circle me-2"></i>Item Information</h6>
             </div>
             <div class="card-body">
                 <div class="row g-4">
@@ -76,60 +76,60 @@
                     <div class="col-12 col-md-4">
                         <div class="d-flex align-items-center mb-1 text-muted">
                             <i class="bi bi-box-seam me-2"></i>
-                            <small class="fw-bold text-uppercase">Item Name</small>
+                            <small class="fw-semibold text-uppercase stock-item-info-label">Item Name</small>
                         </div>
                         <div class="ps-4">
-                            <h6 class="fw-bold text-dark mb-0">{{ $item->item_name ?? '-' }}</h6>
+                            <div class="fw-medium text-dark mb-0 stock-item-info-value">{{ $item->item_name ?? '-' }}</div>
                         </div>
                     </div>
                     <!-- SKU -->
                     <div class="col-12 col-md-4">
                         <div class="d-flex align-items-center mb-1 text-muted">
                             <i class="bi bi-upc-scan me-2"></i>
-                            <small class="fw-bold text-uppercase">SKU</small>
+                            <small class="fw-semibold text-uppercase stock-item-info-label">SKU</small>
                         </div>
                         <div class="ps-4">
-                            <h6 class="fw-bold text-dark mb-0">{{ $item->sku ?? '-' }}</h6>
+                            <div class="fw-medium text-dark mb-0 stock-item-info-value">{{ $item->sku ?? '-' }}</div>
                         </div>
                     </div>
                     <!-- Category -->
                     <div class="col-12 col-md-4">
                         <div class="d-flex align-items-center mb-1 text-muted">
                             <i class="bi bi-tags me-2"></i>
-                            <small class="fw-bold text-uppercase">Category</small>
+                            <small class="fw-semibold text-uppercase stock-item-info-label">Category</small>
                         </div>
                         <div class="ps-4">
-                            <h6 class="fw-bold text-dark mb-0">{{ $item->category->category_name ?? '-' }}</h6>
+                            <div class="fw-medium text-dark mb-0 stock-item-info-value">{{ $item->category->category_name ?? '-' }}</div>
                         </div>
                     </div>
                     <!-- Unit -->
                     <div class="col-12 col-md-4">
                         <div class="d-flex align-items-center mb-1 text-muted">
                             <i class="bi bi-rulers me-2"></i>
-                            <small class="fw-bold text-uppercase">Unit</small>
+                            <small class="fw-semibold text-uppercase stock-item-info-label">Unit</small>
                         </div>
                         <div class="ps-4">
-                            <h6 class="fw-bold text-dark mb-0">{{ $item->unit->unit_name ?? '-' }}</h6>
+                            <div class="fw-medium text-dark mb-0 stock-item-info-value">{{ $item->unit->unit_name ?? '-' }}</div>
                         </div>
                     </div>
                     <!-- Current Quantity -->
                     <div class="col-12 col-md-4">
                         <div class="d-flex align-items-center mb-1 text-muted">
                             <i class="bi bi-layers me-2"></i>
-                            <small class="fw-bold text-uppercase">Current Quantity</small>
+                            <small class="fw-semibold text-uppercase stock-item-info-label">Current Quantity</small>
                         </div>
                         <div class="ps-4">
-                            <h6 class="fw-bold text-dark mb-0">{{ $item->current_quantity ?? '0' }}</h6>
+                            <div class="fw-medium text-dark mb-0 stock-item-info-value">{{ $item->current_quantity ?? '0' }}</div>
                         </div>
                     </div>
                     <!-- Description -->
                     <div class="col-12">
                         <div class="d-flex align-items-center mb-1 text-muted">
                             <i class="bi bi-file-text me-2"></i>
-                            <small class="fw-bold text-uppercase">Description</small>
+                            <small class="fw-semibold text-uppercase stock-item-info-label">Description</small>
                         </div>
                         <div class="ps-4">
-                            <p class="text-secondary mb-0">{{ $item->description ?? '-' }}</p>
+                            <p class="text-secondary mb-0 stock-item-info-value">{{ $item->description ?? '-' }}</p>
                         </div>
                     </div>
                 </div>
@@ -178,6 +178,8 @@
                         <th>Serial</th>
                         <th>Full Code</th>
                         <th>QR Code</th>
+                        <th class="text-nowrap">PC/S inside the {{ $item->unit->unit_name ?? 'unit' }}</th>
+                        <th class="text-nowrap">PC/S Remaining</th>
                         <th>Date Created</th>
                         <th class="text-center">Printed</th>
                         <th>Action</th>
@@ -192,6 +194,30 @@
                         <td>{{ $transaction->serial ?? '-' }}</td>
                         <td>{{ $transaction->full_code ?? '-' }}</td>
                         <td>{{ $transaction->qr_code ?? '-' }}</td>
+                        <td class="text-nowrap" style="min-width: 130px;">
+                            <span class="form-control-plaintext d-inline-block py-0 mb-0 fw-medium text-dark">
+                                {{ $item->pcs_per_unit ?? '-' }}
+                            </span>
+                        </td>
+                        <td class="text-nowrap" style="min-width: 130px;">
+                            @if($transaction->is_printed)
+                                <span class="form-control-plaintext d-inline-block py-0 mb-0 fw-medium text-dark">
+                                    {{ $transaction->pcs_per_unit ?? '-' }}
+                                </span>
+                            @else
+                                <input
+                                    type="number"
+                                    class="form-control form-control-sm pcs-input"
+                                    value="{{ $transaction->pcs_per_unit ?? '' }}"
+                                    min="0"
+                                    step="1"
+                                    inputmode="numeric"
+                                    data-transaction-id="{{ $transaction->transaction_id }}"
+                                    data-original-value="{{ $transaction->pcs_per_unit ?? '' }}"
+                                    style="max-width: 120px;"
+                                >
+                            @endif
+                        </td>
                         <td>{{ \Carbon\Carbon::parse($transaction->transaction_date)->format('Y-m-d H:i:s') ?? ''}}</td>
                         <td class="text-center">
                             @if($transaction->is_printed)
@@ -215,7 +241,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" class="text-center">No transactions found.</td>
+                        <td colspan="9" class="text-center">No transactions found.</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -288,6 +314,31 @@
 
 @endsection
 
+@push('styles')
+<style>
+    .stock-item-info-card .card-header {
+        padding-top: .55rem;
+        padding-bottom: .55rem;
+    }
+
+    .stock-item-info-title {
+        font-size: .95rem;
+        line-height: 1.25;
+    }
+
+    .stock-item-info-label {
+        font-size: .74rem;
+        line-height: 1.2;
+        letter-spacing: .02em;
+    }
+
+    .stock-item-info-value {
+        font-size: .88rem;
+        line-height: 1.35;
+    }
+</style>
+@endpush
+
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script>
@@ -327,8 +378,58 @@
     $(document).ready(function() {
         // ... (existing code)
 
+        function sanitizeIntegerInput($input) {
+            let value = String($input.val() ?? '').replace(/[^\d]/g, '');
+            if (value === '') {
+                $input.val('');
+                return '';
+            }
+            $input.val(parseInt(value, 10));
+            return $input.val();
+        }
+
+        function savePcsValue($input) {
+            const transactionId = $input.data('transaction-id');
+            const pcsValue = sanitizeIntegerInput($input);
+            const originalValue = String($input.data('original-value') ?? '');
+
+            if (String(pcsValue ?? '') === originalValue) {
+                return;
+            }
+
+            $input.prop('disabled', true);
+
+            $.ajax({
+                url: "{{ url('stock-in/transaction') }}/" + transactionId + "/pcs",
+                method: 'POST',
+                data: {
+                    pcs_per_unit: pcsValue === '' ? null : pcsValue,
+                },
+                success: function(response) {
+                    $input.data('original-value', response.pcs_per_unit ?? '');
+                    toastr.success(response.message || 'PCS value updated successfully.');
+                },
+                error: function(xhr) {
+                    const message = xhr.responseJSON?.message || 'Failed to update PCS value.';
+                    toastr.error(message);
+                    $input.val(originalValue);
+                },
+                complete: function() {
+                    $input.prop('disabled', false);
+                }
+            });
+        }
+
         $('#selectAll').change(function() {
             $('.unit-checkbox').prop('checked', $(this).prop('checked'));
+        });
+
+        $(document).on('input', '.pcs-input', function() {
+            sanitizeIntegerInput($(this));
+        });
+
+        $(document).on('blur', '.pcs-input', function() {
+            savePcsValue($(this));
         });
 
         $('#btnPrintSelected').click(function() {

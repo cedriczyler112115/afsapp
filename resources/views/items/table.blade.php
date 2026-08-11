@@ -7,6 +7,7 @@
                 <th class="text-nowrap">SKU</th>
                 <th class="text-nowrap">Category</th>
                 <th class="text-nowrap">Unit</th>
+                <th class="text-nowrap">PC/S inside the unit</th>
                 <th class="text-nowrap">Reorder Level</th>
                 <th class="text-nowrap">Description</th>
                 <th class="text-nowrap" width="150px">Action</th>
@@ -20,6 +21,7 @@
                 <td>{{ $item->sku }}</td>
                 <td>{{ $item->category->category_name ?? '-' }}</td>
                 <td>{{ $item->unit->unit_name ?? '-' }}</td>
+                <td>{{ $item->pcs_per_unit ?? '-' }}</td>
                 <td>{{ $item->reorder_level }}</td>
                 <td>{{ $item->description }}</td>
                 <td>

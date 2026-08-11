@@ -15,6 +15,7 @@ use App\Http\Controllers\MonthlyTransactionController;
 use App\Http\Controllers\StockInController;
 use App\Http\Controllers\StockOutController;
 use App\Http\Controllers\StockReturnController;
+use App\Http\Controllers\SupplyRequestController;
 use App\Http\Controllers\TrackingDashboardController;
 use App\Http\Controllers\UnitOfMeasureController;
 use App\Http\Controllers\UserManagementController;
@@ -77,6 +78,15 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureProfileIsComplete::class])
     Route::get('monthly-transactions', [MonthlyTransactionController::class, 'index'])->name('monthly-transactions.index');
     Route::get('monthly-transactions/print', [MonthlyTransactionController::class, 'print'])->name('monthly-transactions.print');
 
+    Route::get('supply-requests', [SupplyRequestController::class, 'index'])->name('supply-requests.index');
+    Route::get('supply-requests/create', [SupplyRequestController::class, 'create'])->name('supply-requests.create');
+    Route::post('supply-requests', [SupplyRequestController::class, 'store'])->name('supply-requests.store');
+    Route::get('supply-requests/{supplyRequest}', [SupplyRequestController::class, 'show'])->name('supply-requests.show');
+    Route::post('supply-requests/{supplyRequest}/approve', [SupplyRequestController::class, 'approve'])->name('supply-requests.approve');
+    Route::post('supply-requests/{supplyRequest}/reject', [SupplyRequestController::class, 'reject'])->name('supply-requests.reject');
+    Route::post('supply-requests/{supplyRequest}/cancel', [SupplyRequestController::class, 'cancel'])->name('supply-requests.cancel');
+    Route::post('supply-requests/{supplyRequest}/issuances/{issuance}/receive', [SupplyRequestController::class, 'receive'])->name('supply-requests.receive');
+
     Route::resource('categories', CategoryController::class);
     Route::resource('unit_of_measures', UnitOfMeasureController::class);
     Route::resource('items', ItemController::class);
@@ -89,6 +99,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureProfileIsComplete::class])
     Route::post('stock-in/transaction/store/{item_id}', [StockInController::class, 'storeTransaction'])->name('stock-in.transaction.store');
     Route::post('stock-in/bulk-store/{item_id}', [StockInController::class, 'bulkStore'])->name('stock-in.bulk-store');
     Route::post('stock-in/mark-printed', [StockInController::class, 'markAsPrinted'])->name('stock-in.mark-printed');
+    Route::post('stock-in/transaction/{id}/pcs', [StockInController::class, 'updateUnitPcs'])->name('stock-in.transaction.update-pcs');
     Route::get('public/stock-in/item/{id}', [StockInController::class, 'getItemDetails'])->name('stock-in.get-item');
 
     // Stock Out Routes
@@ -105,6 +116,11 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureProfileIsComplete::class])
 
     // Borrowing & Return Routes
     Route::get('borrowings/units/{item_id}', [BorrowingController::class, 'getAvailableUnits'])->name('borrowings.units');
+    Route::post('borrowings/{borrowing}/approve', [BorrowingController::class, 'approve'])->name('borrowings.approve');
+    Route::post('borrowings/{borrowing}/receive', [BorrowingController::class, 'receive'])->name('borrowings.receive');
+    Route::post('borrowings/{borrowing}/request-return', [BorrowingController::class, 'requestReturn'])->name('borrowings.request-return');
+    Route::post('borrowings/{borrowing}/confirm-return', [BorrowingController::class, 'confirmReturn'])->name('borrowings.confirm-return');
+    Route::post('borrowings/{borrowing}/cancel', [BorrowingController::class, 'cancel'])->name('borrowings.cancel');
     Route::resource('borrowings', BorrowingController::class);
     // Damaged Items Routes
     Route::get('damaged-items', [DamagedItemController::class, 'index'])->name('damaged-items.index');

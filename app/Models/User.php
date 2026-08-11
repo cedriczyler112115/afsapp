@@ -94,6 +94,11 @@ class User extends Authenticatable
         return $this->hasMany(Borrowing::class, 'issued_by');
     }
 
+    public function supplyRequests()
+    {
+        return $this->hasMany(SupplyRequest::class, 'requester_id');
+    }
+
     public function userLevel()
     {
         return $this->belongsTo(UserLevel::class, 'level_id', 'id');

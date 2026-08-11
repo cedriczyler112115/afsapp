@@ -42,18 +42,25 @@ class ItemController extends Controller
      */
     public function store(Request $request)
     {
+        $unitName = $this->resolveUnitName($request->input('unit_id'));
+
         $request->validate([
             'item_name' => 'required|string|max:150',
             'sku' => 'required|string|max:50|unique:items,sku',
             'category_id' => 'required|integer',
             'unit_id' => 'required|integer',
+            'pcs_per_unit' => $unitName && strcasecmp($unitName, 'box') === 0 ? 'required|integer|min:1' : 'nullable|integer|min:1',
             'reorder_level' => 'required|integer',
             'description' => 'nullable|string',
         ]);
 
         $data = $request->only([
-            'item_name', 'sku', 'category_id', 'unit_id', 'reorder_level', 'description',
+            'item_name', 'sku', 'category_id', 'unit_id', 'pcs_per_unit', 'reorder_level', 'description',
         ]);
+
+        if (! $unitName || strcasecmp($unitName, 'box') !== 0) {
+            $data['pcs_per_unit'] = null;
+        }
 
         $data['create_by'] = Auth::id() ?? 1; // Default to 1 if no auth for now
         $data['date_created'] = now();
@@ -80,11 +87,14 @@ class ItemController extends Controller
      */
     public function update(Request $request, $id)
     {
+        $unitName = $this->resolveUnitName($request->input('unit_id'));
+
         $request->validate([
             'item_name' => 'required|string|max:150',
             'category_id' => 'required|integer',
             'sku' => 'required|string|max:50|unique:items,sku,'.$id.',item_id',
             'unit_id' => 'required|integer',
+            'pcs_per_unit' => $unitName && strcasecmp($unitName, 'box') === 0 ? 'required|integer|min:1' : 'nullable|integer|min:1',
             'reorder_level' => 'required|integer',
             'description' => 'nullable|string',
         ]);
@@ -92,8 +102,12 @@ class ItemController extends Controller
         $item = Item::findOrFail($id);
 
         $data = $request->only([
-            'item_name', 'sku', 'category_id', 'unit_id', 'reorder_level', 'description',
+            'item_name', 'sku', 'category_id', 'unit_id', 'pcs_per_unit', 'reorder_level', 'description',
         ]);
+
+        if (! $unitName || strcasecmp($unitName, 'box') !== 0) {
+            $data['pcs_per_unit'] = null;
+        }
 
         $item->update($data);
 
@@ -108,5 +122,14 @@ class ItemController extends Controller
         Item::destroy($id);
 
         return response()->json(['success' => 'Item deleted successfully']);
+    }
+
+    private function resolveUnitName($unitId): ?string
+    {
+        if (! $unitId) {
+            return null;
+        }
+
+        return UnitOfMeasure::where('id', $unitId)->value('unit_name');
     }
 }

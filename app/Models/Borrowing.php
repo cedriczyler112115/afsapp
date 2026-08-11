@@ -14,6 +14,11 @@ class Borrowing extends Model
     protected $casts = [
         'borrow_date' => 'datetime',
         'expected_return_date' => 'datetime',
+        'requested_at' => 'datetime',
+        'approved_at' => 'datetime',
+        'received_at' => 'datetime',
+        'return_requested_at' => 'datetime',
+        'returned_at' => 'datetime',
     ];
 
     public function borrower()

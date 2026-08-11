@@ -112,7 +112,10 @@
                                     <span class="text-muted">Bulk / non-serialized</span>
                                 @endif
                             </td>
-                            <td class="text-center">{{ number_format($transaction->transaction_quantity) }}</td>
+                            <td class="text-center">
+                                {{ number_format($transaction->transaction_quantity) }}
+                                @if($transaction->type === 'OUT')<small class="d-block text-muted">PC/S · {{ ($transaction->issue_mode ?? 'BOX') === 'BOX' ? 'Box' : 'By piece' }}</small>@endif
+                            </td>
                             <td>
                                 <div>{{ $transaction->party_name }}</div>
                                 <small class="text-muted">{{ $transaction->party_role }}</small>

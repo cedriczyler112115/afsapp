@@ -41,7 +41,8 @@
             <div class="card bg-success text-white h-100 shadow-sm" style="cursor: pointer;" onclick="window.location.href='{{ route('stock-in.index') }}'">
                 <div class="card-body p-2 d-flex flex-column justify-content-center align-items-center text-center">
                     <h2 class="fw-bold mb-0">{{ number_format($totalStockQuantity) }}</h2>
-                    <small>Total Stock Qty</small>
+                    <small>Available Item Units</small>
+                    <div class="small fw-semibold mt-1">{{ number_format($totalStockPieces) }} PC/S</div>
                 </div>
             </div>
         </div>
@@ -180,7 +181,8 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>Item</th>
-                                    <th>Qty</th>
+                                    <th>Units</th>
+                                    <th>PC/S</th>
                                     <th>Reorder</th>
                                     <th>Status</th>
                                 </tr>
@@ -192,12 +194,13 @@
                                             <div class="fw-bold text-truncate" style="max-width: 200px;" title="{{ $item->item_name }}">{{ $item->item_name }}</div>
                                             <small class="text-muted">{{ $item->sku }}</small>
                                         </td>
-                                        <td class="fw-bold {{ $item->current_quantity == 0 ? 'text-danger' : '' }}">{{ $item->current_quantity }}</td>
+                                        <td class="fw-bold {{ $item->available_units == 0 ? 'text-danger' : '' }}">{{ number_format($item->available_units) }}</td>
+                                        <td>{{ number_format($item->available_pieces) }}</td>
                                         <td>{{ $item->reorder_level }}</td>
                                         <td>
-                                            @if($item->current_quantity == 0)
+                                            @if($item->available_units == 0)
                                                 <span class="badge bg-danger">Out of Stock</span>
-                                            @elseif($item->current_quantity < $item->reorder_level)
+                                            @elseif($item->available_units < $item->reorder_level)
                                                 <span class="badge bg-danger">Critical</span>
                                             @else
                                                 <span class="badge bg-warning text-dark">Low</span>
@@ -206,7 +209,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="text-center text-muted py-3">No low stock items found.</td>
+                                        <td colspan="5" class="text-center text-muted py-3">No low stock items found.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -241,7 +244,7 @@
                                         @endif
                                         <small class="text-muted ms-2">{{ $activity->item->sku ?? '' }}</small>
                                     </div>
-                                    <small>Qty: 1</small>
+                                    <small>Qty: {{ number_format($activity->quantity ?? 1) }}@if($activity->type === 'OUT') PC/S ({{ ($activity->issue_mode ?? 'BOX') === 'BOX' ? 'Box' : 'By piece' }})@endif</small>
                                 </div>
                             </div>
                         @empty
@@ -265,7 +268,7 @@
         let categoryChart;
 
         // Function to render chart
-        function renderCategoryChart(labels, stockData, issuedData, title) {
+        function renderCategoryChart(labels, stockData, piecesData, issuedData, title) {
             if (categoryChart) {
                 categoryChart.destroy();
             }
@@ -276,10 +279,17 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: 'Stock Quantity',
+                            label: 'Available Item Units',
                             data: stockData,
                             backgroundColor: 'rgba(54, 162, 235, 0.6)',
                             borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Available PC/S',
+                            data: piecesData,
+                            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
                             borderWidth: 1
                         },
                         {
@@ -335,6 +345,7 @@
         renderCategoryChart(
             originalCatData.map(d => d.category_name),
             originalCatData.map(d => d.total_qty),
+            originalCatData.map(d => d.total_pcs),
             originalCatData.map(d => d.issued_qty),
             'Stock Level by Category'
         );
@@ -352,7 +363,8 @@
                     // Update Chart
                     renderCategoryChart(
                         data.items.map(i => i.item_name),
-                        data.items.map(i => i.current_quantity),
+                        data.items.map(i => i.available_units),
+                        data.items.map(i => i.available_pieces),
                         data.items.map(i => i.issued_qty),
                         `Stock Level: ${data.category_name}`
                     );
@@ -369,6 +381,7 @@
             renderCategoryChart(
                 originalCatData.map(d => d.category_name),
                 originalCatData.map(d => d.total_qty),
+                originalCatData.map(d => d.total_pcs),
                 originalCatData.map(d => d.issued_qty),
                 'Stock Level by Category'
             );

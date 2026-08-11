@@ -37,13 +37,19 @@
                             </a>
                         </th>
                         <th scope="col">
-                            <a href="{{ route('low-stock.index', ['sort' => 'current_quantity', 'direction' => request('sort') == 'current_quantity' && request('direction') == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark d-flex align-items-center">
-                                Current Qty
-                                @if(request('sort') == 'current_quantity')
+                            <a href="{{ route('low-stock.index', ['sort' => 'available_units', 'direction' => request('sort') == 'available_units' && request('direction') == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark d-flex align-items-center">
+                                Available Units
+                                @if(request('sort') == 'available_units')
                                     <i class="bi bi-arrow-{{ request('direction') == 'asc' ? 'up' : 'down' }} ms-1"></i>
                                 @else
                                     <i class="bi bi-arrow-down-up ms-1 text-muted opacity-25"></i>
                                 @endif
+                            </a>
+                        </th>
+                        <th scope="col">
+                            <a href="{{ route('low-stock.index', ['sort' => 'available_pieces', 'direction' => request('sort') == 'available_pieces' && request('direction') == 'asc' ? 'desc' : 'asc']) }}" class="text-decoration-none text-dark d-flex align-items-center">
+                                Available PC/S
+                                @if(request('sort') == 'available_pieces')<i class="bi bi-arrow-{{ request('direction') == 'asc' ? 'up' : 'down' }} ms-1"></i>@else<i class="bi bi-arrow-down-up ms-1 text-muted opacity-25"></i>@endif
                             </a>
                         </th>
                         <th scope="col">
@@ -84,14 +90,17 @@
                 <tbody>
                     @forelse($items as $item)
                         @php
-                            $shortage = $item->current_quantity - $item->reorder_level;
+                            $shortage = $item->available_units - $item->reorder_level;
                             $status = '';
                             $statusColor = '';
                             
-                            if ($item->current_quantity < $item->reorder_level) {
+                            if ($item->available_units == 0) {
+                                $status = 'Out of Stock';
+                                $statusColor = 'text-danger';
+                            } elseif ($item->available_units < $item->reorder_level) {
                                 $status = 'Critical';
                                 $statusColor = 'text-danger';
-                            } elseif ($item->current_quantity == $item->reorder_level) {
+                            } elseif ($item->available_units == $item->reorder_level) {
                                 $status = 'Low';
                                 $statusColor = 'text-warning';
                             } else {
@@ -107,7 +116,8 @@
                                     <small class="text-muted">{{ $item->category->category_name }}</small>
                                 @endif
                             </td>
-                            <td>{{ $item->current_quantity }}</td>
+                            <td>{{ number_format($item->available_units) }}</td>
+                            <td>{{ number_format($item->available_pieces) }}</td>
                             <td>{{ $item->reorder_level }}</td>
                             <td>
                                 <span class="{{ $shortage < 0 ? 'text-danger' : ($shortage == 0 ? 'text-warning' : 'text-success') }}">
@@ -126,7 +136,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center py-4 text-muted">
+                            <td colspan="8" class="text-center py-4 text-muted">
                                 <i class="bi bi-inbox fs-4 d-block mb-2"></i>
                                 No items found.
                             </td>

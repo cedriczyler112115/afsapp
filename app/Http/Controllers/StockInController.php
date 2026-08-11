@@ -37,6 +37,7 @@ class StockInController extends Controller
                 'items.category_id',
                 'items.unit_id as uom_id', // Unit of measure
                 DB::raw('SUM(CASE WHEN item_units.status = 1 THEN 1 ELSE 0 END) as current_quantity'),
+                DB::raw('SUM(CASE WHEN item_units.status = 1 THEN COALESCE(item_units.pcs_per_unit, 1) ELSE 0 END) as current_pieces'),
                 'items.reorder_level',
                 'items.description as item_description',
                 'items.create_by as item_created_by',
@@ -81,6 +82,7 @@ class StockInController extends Controller
         }
 
         $overallTotalQuantity = $totalQuery->count();
+        $overallTotalPieces = (clone $totalQuery)->sum(DB::raw('COALESCE(item_units.pcs_per_unit, 1)'));
 
         // Hostinger enables MySQL's ONLY_FULL_GROUP_BY mode. Every selected
         // non-aggregate column must therefore be included in GROUP BY.
@@ -118,10 +120,10 @@ class StockInController extends Controller
                 return response()->json($itemsQuery->get());
             }
 
-            return view('stock_in.table', compact('stockTransactions', 'overallTotalQuantity'))->render();
+            return view('stock_in.table', compact('stockTransactions', 'overallTotalQuantity', 'overallTotalPieces'))->render();
         }
 
-        return view('stock_in.index', compact('stockTransactions', 'items', 'categories', 'overallTotalQuantity'));
+        return view('stock_in.index', compact('stockTransactions', 'items', 'categories', 'overallTotalQuantity', 'overallTotalPieces'));
     }
 
     public function create()
@@ -146,11 +148,12 @@ class StockInController extends Controller
             ->join('items', 'stock_transactions.item_id', '=', 'items.item_id')
             ->join('item_units', 'stock_transactions.unit_id', '=', 'item_units.id')
             ->select(
-                'stock_transactions.id as transaction_id',
-                'stock_transactions.date_created as transaction_date',
+                DB::raw('MAX(stock_transactions.id) as transaction_id'),
+                DB::raw('MAX(stock_transactions.date_created) as transaction_date'),
                 'item_units.serial',
                 'item_units.full_code',
                 'item_units.qr_code',
+                'item_units.pcs_per_unit',
                 'item_units.is_printed',
                 'item_units.id as unit_id'
             )
@@ -161,7 +164,14 @@ class StockInController extends Controller
             $query->whereDate('stock_transactions.date_created', $dateFilter);
         }
 
-        $query->orderBy('stock_transactions.date_created', 'desc');
+        $query->groupBy(
+            'item_units.id',
+            'item_units.serial',
+            'item_units.full_code',
+            'item_units.qr_code',
+            'item_units.pcs_per_unit',
+            'item_units.is_printed'
+        )->orderByDesc(DB::raw('MAX(stock_transactions.date_created)'));
 
         if ($perPage === 'all') {
             $stockTransactions = $query->paginate(999999)->appends(['per_page' => 'all', 'date_filter' => $dateFilter]);
@@ -285,6 +295,7 @@ class StockInController extends Controller
                 'item_id' => $item_id,
                 'serial' => $request->input('serial'),
                 'qr_code' => $request->input('qr_code'),
+                'pcs_per_unit' => $item->pcs_per_unit,
                 'status' => 1,
                 'date_created' => now(),
                 'created_by' => Auth::id() ?? 1,
@@ -330,6 +341,7 @@ class StockInController extends Controller
                 // 1. Create ItemUnit (without full_code initially)
                 $itemUnit = ItemUnit::create([
                     'item_id' => $item_id,
+                    'pcs_per_unit' => $item->pcs_per_unit,
                     'status' => 1,
                     'date_created' => now(),
                     'created_by' => Auth::id() ?? 1,
@@ -370,12 +382,23 @@ class StockInController extends Controller
     {
         $item = Item::with(['category', 'unit'])->find($id);
         if ($item) {
+            $printedQuantity = ItemUnit::where('item_id', $item->item_id)
+                ->where('status', 1)
+                ->where('is_printed', 1)
+                ->count();
+            $printedPieces = ItemUnit::where('item_id', $item->item_id)
+                ->where('status', 1)
+                ->where('is_printed', 1)
+                ->sum(DB::raw('COALESCE(pcs_per_unit, 1)'));
+
             return response()->json([
                 'item_name' => $item->item_name,
                 'sku' => $item->sku,
                 'category' => $item->category ? $item->category->category_name : '',
                 'unit' => $item->unit ? $item->unit->unit_name : '',
                 'current_quantity' => $item->current_quantity,
+                'printed_quantity' => $printedQuantity,
+                'printed_pieces' => (int) $printedPieces,
                 'description' => $item->description,
             ]);
         }
@@ -426,6 +449,7 @@ class StockInController extends Controller
                     'serial' => $unitData['serial'] ?? null,
                     'full_code' => $unitData['full_code'] ?? null,
                     'qr_code' => $unitData['qr_code'] ?? null,
+                    'pcs_per_unit' => $item->pcs_per_unit,
                     'status' => 1, // Active
                     'date_created' => now(),
                     'created_by' => Auth::id() ?? 1,
@@ -478,6 +502,26 @@ class StockInController extends Controller
         ]);
 
         return response()->json(['success' => 'Stock details updated successfully.']);
+    }
+
+    public function updateUnitPcs(Request $request, $id)
+    {
+        $request->validate([
+            'pcs_per_unit' => 'nullable|integer|min:0',
+        ]);
+
+        $transaction = StockTransaction::findOrFail($id);
+        $unit = ItemUnit::findOrFail($transaction->unit_id);
+
+        $unit->update([
+            'pcs_per_unit' => $request->input('pcs_per_unit'),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'PCS value updated successfully.',
+            'pcs_per_unit' => $unit->pcs_per_unit,
+        ]);
     }
 
     /**

@@ -18,8 +18,28 @@
     .accordion-button-icon {
         transition: transform 0.2s ease-in-out;
     }
+    .accordion-button-icon.rotated {
+        transform: rotate(-180deg);
+    }
     .collapsed .accordion-button-icon {
         transform: rotate(-90deg);
+    }
+    .stock-out-info-card .card-header {
+        padding-top: .55rem;
+        padding-bottom: .55rem;
+    }
+    .stock-out-info-title {
+        font-size: .95rem;
+        line-height: 1.25;
+    }
+    .stock-out-info-label {
+        font-size: .74rem;
+        line-height: 1.2;
+        letter-spacing: .02em;
+    }
+    .stock-out-info-value {
+        font-size: .88rem;
+        line-height: 1.35;
     }
 </style>
 <div class="card">
@@ -30,6 +50,32 @@
     <div class="card-body">
         <form id="stockOutForm" autocomplete="off">
             @csrf
+            <div class="card border-primary-subtle mb-3">
+                <div class="card-body p-2 p-md-3">
+                    <label for="approved_request_item" class="form-label fw-semibold mb-1">
+                        <i class="bi bi-clipboard-check me-1"></i>Approved Supply Request
+                    </label>
+                    <select id="approved_request_item" class="form-select form-select-sm">
+                        <option value="">Direct issuance (without request)</option>
+                        @foreach($approvedRequestItems as $approvedItem)
+                            <option value="{{ $approvedItem->id }}" @selected($requestItem?->id === $approvedItem->id)>
+                                {{ $approvedItem->supplyRequest->request_no }} - {{ $approvedItem->supplyRequest->requester->name }} - {{ $approvedItem->item->item_name }} ({{ number_format($approvedItem->remaining_quantity) }} {{ $approvedItem->issue_mode === 'BOX' ? 'box(es)' : 'PC/S' }} remaining)
+                            </option>
+                        @endforeach
+                    </select>
+                    <div class="form-text">Select an approved request to use its requester, item, purpose, and approved balance as the basis of this issuance.</div>
+                </div>
+            </div>
+            @if($requestItem)
+                <input type="hidden" name="supply_request_item_id" value="{{ $requestItem->id }}">
+                <div class="alert alert-info py-2 mb-3">
+                    <i class="bi bi-clipboard-check me-1"></i>
+                    Issuing against request <strong>{{ $requestItem->supplyRequest->request_no }}</strong> for
+                    <strong>{{ $requestItem->supplyRequest->requester->name }}</strong>.
+                    Issue by: <strong>{{ $requestItem->issue_mode === 'BOX' ? 'Box' : 'PC/S' }}</strong>.
+                    Remaining approved balance: <strong>{{ number_format($requestItem->remaining_quantity) }} {{ $requestItem->issue_mode === 'BOX' ? 'box(es)' : 'PC/S' }}</strong>.
+                </div>
+            @endif
             
             <!-- Issuance Details -->
             <div class="card mb-4 border-0 shadow-sm">
@@ -43,13 +89,13 @@
                             <select class="form-select" id="user_id" name="user_id" required>
                                 <option value="">Select Receiver</option>
                                 @foreach($users as $user)
-                                    <option value="{{ $user->id }}">{{ $user->name }}</option>
+                                    <option value="{{ $user->id }}" @selected($requestItem && $requestItem->supplyRequest->requester_id === $user->id)>{{ $user->name }}</option>
                                 @endforeach
                             </select>
                         </div>
                         <div class="col-md-6">
                             <label for="remarks" class="form-label fw-bold">Remarks / Issued to (Write the accountable person)</label>
-                            <textarea class="form-control" id="remarks" name="remarks" rows="1" placeholder="Optional remarks..."></textarea>
+                            <textarea class="form-control" id="remarks" name="remarks" rows="1" placeholder="Optional remarks...">@if($requestItem)Request {{ $requestItem->supplyRequest->request_no }}: {{ $requestItem->supplyRequest->purpose }}@if($requestItem->notes) - {{ $requestItem->notes }}@endif @endif</textarea>
                         </div>
                     </div>
                 </div>
@@ -61,94 +107,98 @@
                 <select class="form-select border p-2" id="item_id" name="item_id" required>
                     <option value="">Select Item</option>
                     @foreach($items as $item)
-                        <option value="{{ $item->item_id }}">{{ $item->item_name }} ({{ $item->sku }})</option>
+                        <option value="{{ $item->item_id }}" @selected($requestItem && $requestItem->item_id === $item->item_id)>{{ $item->item_name }} ({{ $item->sku }})</option>
                     @endforeach
                 </select>
             </div>
 
             <!-- Item Info (Read-only) -->
-            <div class="card mb-4 border-0 shadow-sm">
-                <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center collapsed" data-bs-toggle="collapse" data-bs-target="#itemInfoCollapse" style="cursor: pointer;">
-                    <h6 class="mb-0 text-secondary fw-bold"><i class="bi bi-info-circle me-2"></i>Item Information</h6>
+            <div class="card mb-4 border-0 shadow-sm stock-out-info-card">
+                <button type="button" class="card-header bg-light py-2 d-flex justify-content-between align-items-center border-0 w-100 text-start stock-out-info-toggle" style="cursor: pointer; background: transparent;">
+                    <h6 class="mb-0 text-secondary fw-semibold stock-out-info-title"><i class="bi bi-info-circle me-2"></i>Item Information</h6>
                     <i class="bi bi-chevron-down accordion-button-icon"></i>
-                </div>
-                <div id="itemInfoCollapse" class="collapse">
+                </button>
+                <div id="itemInfoCollapse" class="d-none">
                     <div class="card-body">
                         <div class="row g-4">
-                        <!-- Item Name -->
-                        <div class="col-12 col-md-4">
-                            <div class="d-flex align-items-center mb-1 text-muted">
-                                <i class="bi bi-box-seam me-2"></i>
-                                <small class="fw-bold text-uppercase">Item Name</small>
+                            <!-- Item Name -->
+                            <div class="col-12 col-md-4">
+                                <div class="d-flex align-items-center mb-1 text-muted">
+                                    <i class="bi bi-box-seam me-2"></i>
+                                    <small class="fw-semibold text-uppercase stock-out-info-label">Item Name</small>
+                                </div>
+                                <div class="ps-4">
+                                    <div class="fw-medium text-dark mb-0 stock-out-info-value" id="info_item_name">-</div>
+                                </div>
                             </div>
-                            <div class="ps-4">
-                                <h6 class="fw-bold text-dark mb-0" id="info_item_name">-</h6>
+                            <!-- SKU -->
+                            <div class="col-12 col-md-4">
+                                <div class="d-flex align-items-center mb-1 text-muted">
+                                    <i class="bi bi-upc-scan me-2"></i>
+                                    <small class="fw-semibold text-uppercase stock-out-info-label">SKU</small>
+                                </div>
+                                <div class="ps-4">
+                                    <div class="fw-medium text-dark mb-0 stock-out-info-value" id="info_sku">-</div>
+                                </div>
                             </div>
-                        </div>
-                        <!-- SKU -->
-                        <div class="col-12 col-md-4">
-                            <div class="d-flex align-items-center mb-1 text-muted">
-                                <i class="bi bi-upc-scan me-2"></i>
-                                <small class="fw-bold text-uppercase">SKU</small>
+                            <!-- Category -->
+                            <div class="col-12 col-md-4">
+                                <div class="d-flex align-items-center mb-1 text-muted">
+                                    <i class="bi bi-tags me-2"></i>
+                                    <small class="fw-semibold text-uppercase stock-out-info-label">Category</small>
+                                </div>
+                                <div class="ps-4">
+                                    <div class="fw-medium text-dark mb-0 stock-out-info-value" id="info_category">-</div>
+                                </div>
                             </div>
-                            <div class="ps-4">
-                                <h6 class="fw-bold text-dark mb-0" id="info_sku">-</h6>
+                            <!-- Unit -->
+                            <div class="col-12 col-md-4">
+                                <div class="d-flex align-items-center mb-1 text-muted">
+                                    <i class="bi bi-rulers me-2"></i>
+                                    <small class="fw-semibold text-uppercase stock-out-info-label">Unit</small>
+                                </div>
+                                <div class="ps-4">
+                                    <div class="fw-medium text-dark mb-0 stock-out-info-value" id="info_unit">-</div>
+                                </div>
+                                <div class="d-flex align-items-center mb-1 mt-3 text-muted">
+                                    <i class="bi bi-calculator me-2"></i>
+                                    <small class="fw-semibold text-uppercase stock-out-info-label">Remaining PC/S After This Issuance</small>
+                                </div>
+                                <div class="ps-4 d-flex align-items-center">
+                                    <div class="fw-medium text-dark mb-0 stock-out-info-value me-2" id="info_remaining_stock">-</div>
+                                    <span class="badge bg-danger d-none blink-badge" id="zero_stock_badge">No Stock Left</span>
+                                </div>
                             </div>
-                        </div>
-                        <!-- Category -->
-                        <div class="col-12 col-md-4">
-                            <div class="d-flex align-items-center mb-1 text-muted">
-                                <i class="bi bi-tags me-2"></i>
-                                <small class="fw-bold text-uppercase">Category</small>
+                            <!-- Current Quantity -->
+                            <div class="col-12 col-md-4">
+                                <div class="d-flex align-items-center mb-1 text-muted">
+                                    <i class="bi bi-layers me-2"></i>
+                                    <small class="fw-semibold text-uppercase stock-out-info-label">Current Quantity (PC/S)</small>
+                                </div>
+                                <div class="ps-4">
+                                    <div class="fw-medium text-dark mb-0 stock-out-info-value" id="info_current_quantity">-</div>
+                                </div>
+                                <div class="d-flex align-items-center mb-1 mt-3 text-muted">
+                                    <i class="bi bi-file-text me-2"></i>
+                                    <small class="fw-semibold text-uppercase stock-out-info-label">Description</small>
+                                </div>
+                                <div class="ps-4">
+                                    <p class="text-secondary mb-0 stock-out-info-value" id="info_description">-</p>
+                                </div>
                             </div>
-                            <div class="ps-4">
-                                <h6 class="fw-bold text-dark mb-0" id="info_category">-</h6>
-                            </div>
-                        </div>
-                        <!-- Unit -->
-                        <div class="col-12 col-md-4">
-                            <div class="d-flex align-items-center mb-1 text-muted">
-                                <i class="bi bi-rulers me-2"></i>
-                                <small class="fw-bold text-uppercase">Unit</small>
-                            </div>
-                            <div class="ps-4">
-                                <h6 class="fw-bold text-dark mb-0" id="info_unit">-</h6>
-                            </div>
-                        </div>
-                        <!-- Current Quantity -->
-                        <div class="col-12 col-md-4">
-                            <div class="d-flex align-items-center mb-1 text-muted">
-                                <i class="bi bi-layers me-2"></i>
-                                <small class="fw-bold text-uppercase">Current Quantity</small>
-                            </div>
-                            <div class="ps-4">
-                                <h6 class="fw-bold text-dark mb-0" id="info_current_quantity">-</h6>
-                            </div>
-                        </div>
-                        <!-- Remaining Stock -->
-                        <div class="col-12 col-md-4">
-                            <div class="d-flex align-items-center mb-1 text-muted">
-                                <i class="bi bi-calculator me-2"></i>
-                                <small class="fw-bold text-uppercase">REMAINING STOCK AFTER THIS ISSUANCE</small>
-                            </div>
-                            <div class="ps-4 d-flex align-items-center">
-                                <h6 class="fw-bold text-dark mb-0 me-2" id="info_remaining_stock">-</h6>
-                                <span class="badge bg-danger d-none blink-badge" id="zero_stock_badge">No Stock Left</span>
-                            </div>
-                        </div>
-                        <!-- Description -->
-                        <div class="col-12">
-                            <div class="d-flex align-items-center mb-1 text-muted">
-                                <i class="bi bi-file-text me-2"></i>
-                                <small class="fw-bold text-uppercase">Description</small>
-                            </div>
-                            <div class="ps-4">
-                                <p class="text-secondary mb-0" id="info_description">-</p>
+                            <!-- Item Unit Quantity -->
+                            <div class="col-12 col-md-4">
+                                <div class="d-flex align-items-center mb-1 text-muted">
+                                    <i class="bi bi-grid-3x3-gap me-2"></i>
+                                    <small class="fw-semibold text-uppercase stock-out-info-label" id="item_unit_quantity_label">Unit Quantity</small>
+                                </div>
+                                <div class="ps-4">
+                                    <div class="fw-medium text-dark mb-0 stock-out-info-value" id="info_item_unit_quantity">-</div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
             </div>
 
             <!-- Item Units Search and Table -->
@@ -178,6 +228,10 @@
                             <th>Serial</th>
                             <th>Full Code</th>
                             <th>QR Code</th>
+                            <th class="text-nowrap">Issue By</th>
+                            <th class="text-nowrap original-pcs-per-unit-col">PC/S per unit</th>
+                            <th class="text-nowrap">Remaining</th>
+                            <th class="text-nowrap pcs-to-issue-col">PC/S to Issue</th>
                             <th style="width: 50px;">Action</th>
                         </tr>
                     </thead>
@@ -214,6 +268,9 @@
                                 <th>Serial</th>
                                 <th>Full Code</th>
                                 <th>QR Code</th>
+                                <th class="text-nowrap">Issue By</th>
+                                <th class="text-nowrap pcs-per-unit-col">PC/S per unit</th>
+                                <th class="text-nowrap pcs-to-issue-col d-none">PC/S to Issue</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -262,6 +319,8 @@
         let unitIndex = 0;
         let addedUnitIds = [];
         let currentItemQuantity = 0;
+        const requestQuantityLimit = {{ $requestItem?->remaining_quantity ?? 'null' }};
+        const requestIssueMode = @json($requestItem?->issue_mode);
 
         // Initialize Select2
         $('#item_id').select2({
@@ -276,6 +335,37 @@
             width: '100%',
             placeholder: 'Select Receiver',
             allowClear: true
+        });
+
+        $('#approved_request_item').select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            placeholder: 'Direct issuance (without request)'
+        }).on('change', function () {
+            const requestItemId = $(this).val();
+            const currentRequestItemId = new URL(window.location.href).searchParams.get('request_item') || '';
+            if (requestItemId === currentRequestItemId) return;
+            const targetUrl = requestItemId
+                ? "{{ route('stock-out.create') }}?request_item=" + encodeURIComponent(requestItemId)
+                : "{{ route('stock-out.create') }}";
+            window.location.href = targetUrl;
+        });
+
+        @if($requestItem)
+            $('#user_id, #item_id').on('select2:opening', function(event) { event.preventDefault(); });
+            $('#user_id, #item_id').attr('aria-readonly', 'true');
+            setTimeout(function () { $('#item_id').trigger('change'); }, 0);
+        @endif
+
+        function setPcsColumnLabels(unitName) {
+            const safeUnitName = (unitName || 'unit').toString().trim() || 'unit';
+            $('.original-pcs-per-unit-col').text(`PC/S per ${safeUnitName}`);
+            $('#modalUnitsTable .pcs-per-unit-col').text(`Remaining PC/S per ${safeUnitName}`);
+        }
+
+        $('.stock-out-info-toggle').on('click', function() {
+            $('#itemInfoCollapse').toggleClass('d-none');
+            $(this).find('.accordion-button-icon').toggleClass('rotated');
         });
 
         // Item Selection Change
@@ -301,8 +391,11 @@
                         $('#info_sku').text(data.sku || '-');
                         $('#info_category').text(data.category || '-');
                         $('#info_unit').text(data.unit || '-');
-                        currentItemQuantity = parseInt(data.current_quantity) || 0;
-                        $('#info_current_quantity').text(data.current_quantity || '0');
+                        $('#item_unit_quantity_label').text(`${data.unit || 'Unit'} Quantity`);
+                        setPcsColumnLabels(data.unit || 'unit');
+                        currentItemQuantity = parseInt(data.printed_pieces) || 0;
+                        $('#info_current_quantity').text(currentItemQuantity || '0');
+                        $('#info_item_unit_quantity').text(parseInt(data.printed_quantity) || 0);
                         updateRemainingStock();
                         $('#info_description').text(data.description || '-');
                     },
@@ -324,7 +417,10 @@
             $('#info_sku').text('-');
             $('#info_category').text('-');
             $('#info_unit').text('-');
+            $('#item_unit_quantity_label').text('Unit Quantity');
+            setPcsColumnLabels('unit');
             $('#info_current_quantity').text('-');
+            $('#info_item_unit_quantity').text('-');
             $('#info_remaining_stock').text('-');
             $('#info_description').text('-');
             $('#zero_stock_badge').addClass('d-none');
@@ -339,7 +435,7 @@
             }
 
             $.ajax({
-                url: "{{ route('stock-out.units', ['item_id' => 'ITEM_ID_PLACEHOLDER']) }}".replace('ITEM_ID_PLACEHOLDER', itemId),
+                url: "{{ route('stock-out.units', ['item_id' => 'ITEM_ID_PLACEHOLDER']) }}".replace('ITEM_ID_PLACEHOLDER', itemId) + (requestIssueMode ? '?request_item={{ $requestItem?->id }}' : ''),
                 type: 'GET',
                 success: function(units) {
                     let tbody = $('#modalUnitsTable tbody');
@@ -363,6 +459,24 @@
                                 <td>${unit.serial || '-'}</td>
                                 <td>${unit.full_code || '-'}</td>
                                 <td>${unit.qr_code || '-'}</td>
+                                <td>
+                                    <select class="form-select form-select-sm issue-mode-input" data-unit-id="${unit.id}">
+                                        <option value="BOX" ${(parseInt(unit.pcs_per_unit) || 1) !== (parseInt(unit.original_pcs_per_unit) || 1) ? 'disabled' : ''}>Box</option>
+                                        <option value="PCS" ${(parseInt(unit.pcs_per_unit) || 1) !== (parseInt(unit.original_pcs_per_unit) || 1) ? 'selected' : ''}>PC/S</option>
+                                    </select>
+                                </td>
+                                <td>${unit.pcs_per_unit ?? 1}</td>
+                                <td class="d-none">
+                                    <input
+                                        type="text"
+                                        class="form-control form-control-sm pcs-to-issue-input"
+                                        value="${parseInt(unit.pcs_per_unit) || 1}"
+                                        inputmode="numeric"
+                                        data-max-pcs="${parseInt(unit.pcs_per_unit) || 0}"
+                                        data-unit-id="${unit.id}"
+                                        style="max-width: 110px;"
+                                    >
+                                </td>
                             </tr>
                         `;
                         tbody.append(row);
@@ -380,6 +494,7 @@
                     $('#selectAllModal').prop('checked', false);
                     $('#inputAutoQty').val(0);
                     $('#availableUnitsModal').modal('show');
+                    syncIssueInputsWithCheckedRows();
                 },
                 error: function() {
                     toastr.error('Failed to fetch available units.');
@@ -389,14 +504,18 @@
 
         // Sync Logic for Quantity Input and Checkboxes
         function updateQtyInput() {
-             let checkedCount = $('.unit-checkbox:checked').length;
-             $('#inputAutoQty').val(checkedCount);
+             let totalIssued = 0;
+             $('#unitsTable tbody tr').each(function() {
+                 let qty = parseInt($(this).find('.pcs-to-issue-input').val()) || 0;
+                 totalIssued += qty;
+             });
+             $('#inputAutoQty').val(totalIssued);
         }
 
         function updateCheckboxesFromQty() {
              let qty = parseInt($('#inputAutoQty').val()) || 0;
              let checkboxes = $('.unit-checkbox');
-             
+
              checkboxes.each(function(index) {
                  $(this).prop('checked', index < qty);
              });
@@ -440,7 +559,87 @@
         // Select All in Modal
         $('#selectAllModal').change(function() {
             $('.unit-checkbox').prop('checked', $(this).prop('checked'));
+            syncIssueInputsWithCheckedRows();
             updateQtyInput();
+        });
+
+        function sanitizeIntegerValue(value) {
+            return String(value ?? '').replace(/[^\d]/g, '');
+        }
+
+        function clampIssueQty($input) {
+            let raw = sanitizeIntegerValue($input.val());
+            let max = parseInt($input.data('max-pcs')) || 0;
+            let qty = parseInt(raw) || 0;
+
+            if (qty < 1) qty = 1;
+            if (max > 0 && qty > max) qty = max;
+
+            $input.val(qty);
+            return qty;
+        }
+
+        function applyIssueMode($row) {
+            const mode = $row.find('.issue-mode-input').val();
+            const $input = $row.find('.pcs-to-issue-input');
+            const max = parseInt($input.data('max-pcs')) || 1;
+            if (mode === 'BOX') {
+                $input.val(max).prop('readonly', true);
+            } else {
+                $input.prop('readonly', false);
+                if ((parseInt($input.val()) || 0) >= max) {
+                    $input.val(max > 1 ? max - 1 : 1);
+                }
+                clampIssueQty($input);
+            }
+        }
+
+        $(document).on('change', '.issue-mode-input', function() {
+            applyIssueMode($(this).closest('tr'));
+            updateQtyInput();
+            updateRemainingStock();
+        });
+
+        function syncIssueInputsWithCheckedRows() {
+            $('#modalUnitsTable tbody tr').each(function() {
+                const $row = $(this);
+                const checked = $row.find('.unit-checkbox').is(':checked');
+                const $input = $row.find('.pcs-to-issue-input');
+                $input.prop('disabled', !checked);
+                if (!checked) {
+                    applyIssueMode($row);
+                } else {
+                    applyIssueMode($row);
+                }
+            });
+        }
+
+        $(document).on('input', '.pcs-to-issue-input', function() {
+            clampIssueQty($(this));
+            updateQtyInput();
+            updateRemainingStock();
+        });
+
+        $('#unitsTable').on('keydown', '.pcs-to-issue-input', function(event) {
+            if (['e', 'E', '+', '-', '.', ','].includes(event.key)) {
+                event.preventDefault();
+            }
+        });
+
+        $(document).on('blur', '.pcs-to-issue-input', function() {
+            clampIssueQty($(this));
+            updateQtyInput();
+            updateRemainingStock();
+        });
+
+        $(document).on('change', '.unit-checkbox', function() {
+             updateQtyInput();
+             syncIssueInputsWithCheckedRows();
+
+             // Also update Select All
+             let total = $('.unit-checkbox').length;
+             let checked = $('.unit-checkbox:checked').length;
+             $('#selectAllModal').prop('checked', total > 0 && total === checked);
         });
 
         // Add Selected Units from Modal
@@ -452,6 +651,9 @@
                 if (typeof unit === 'string') {
                     unit = JSON.parse(unit);
                 }
+                const $row = $(this).closest('tr');
+                unit.issue_mode = $row.find('.issue-mode-input').val();
+                unit.pcs_to_issue = clampIssueQty($row.find('.pcs-to-issue-input'));
                 addUnitRow(unit);
                 selectedCount++;
             });
@@ -583,7 +785,8 @@
                 data: {
                     _token: "{{ csrf_token() }}",
                     item_id: itemId,
-                    query: query
+                    query: query,
+                    request_item_id: {{ $requestItem?->id ?? 'null' }}
                 },
                 success: function(response) {
                     if (response.success) {
@@ -757,7 +960,8 @@
                     data: {
                         _token: "{{ csrf_token() }}",
                         item_id: itemId,
-                        query: query
+                        query: query,
+                        request_item_id: {{ $requestItem?->id ?? 'null' }}
                     },
                     success: function(response) {
                         if (response.success) {
@@ -791,6 +995,12 @@
             addedUnitIds.push(unit.id);
 
             let rowNumber = $('#unitsTable tbody tr').length + 1;
+            const remainingPcs = parseInt(unit.pcs_per_unit) || 1;
+            const originalPcs = parseInt(unit.original_pcs_per_unit) || 1;
+            const isFullBox = remainingPcs === originalPcs;
+            if (!isFullBox) {
+                unit.issue_mode = 'PCS';
+            }
 
             const html = `
                 <tr>
@@ -798,6 +1008,29 @@
                     <td>${unit.serial || '-'}</td>
                     <td>${unit.full_code || '-'}</td>
                     <td>${unit.qr_code || '-'}</td>
+                    <td>
+                        ${requestIssueMode
+                            ? `<select class="form-select form-select-sm issue-mode-input" name="units[${unitIndex}][issue_mode]"><option value="${requestIssueMode}" selected>${requestIssueMode === 'BOX' ? 'Box' : 'PC/S'}</option></select>`
+                            : `<select class="form-select form-select-sm issue-mode-input" name="units[${unitIndex}][issue_mode]"><option value="BOX" ${unit.issue_mode !== 'PCS' ? 'selected' : ''} ${!isFullBox ? 'disabled' : ''}>Box</option><option value="PCS" ${unit.issue_mode === 'PCS' ? 'selected' : ''}>PC/S</option></select>`
+                        }
+                    </td>
+                    <td>${unit.original_pcs_per_unit ?? unit.pcs_per_unit ?? 1}</td>
+                    <td>${unit.pcs_per_unit ?? 1}</td>
+                    <td>
+                        <input
+                            type="number"
+                            class="form-control form-control-sm pcs-to-issue-input"
+                            name="units[${unitIndex}][pcs_to_issue]"
+                            value="${parseInt(unit.pcs_to_issue) || parseInt(unit.pcs_per_unit) || 1}"
+                            inputmode="numeric"
+                            min="1"
+                            max="${parseInt(unit.pcs_per_unit) || 1}"
+                            step="1"
+                            data-max-pcs="${parseInt(unit.pcs_per_unit) || 0}"
+                            data-unit-id="${unit.id}"
+                            style="max-width: 110px;"
+                        >
+                    </td>
                     <td class="text-center">
                         <input type="hidden" name="units[${unitIndex}][unit_id]" value="${unit.id}">
                         <button type="button" class="btn btn-sm btn-danger remove-row mb-0" data-id="${unit.id}"><i class="bi bi-trash"></i></button>
@@ -805,6 +1038,7 @@
                 </tr>
             `;
             $('#unitsTable tbody').append(html);
+            applyIssueMode($('#unitsTable tbody tr').last());
             unitIndex++;
             updateRemainingStock();
         }
@@ -830,7 +1064,10 @@
         });
 
         function updateRemainingStock() {
-            let issuedCount = addedUnitIds.length;
+            let issuedCount = 0;
+            $('#unitsTable tbody .pcs-to-issue-input').each(function() {
+                issuedCount += parseInt($(this).val()) || 0;
+            });
             let remaining = currentItemQuantity - issuedCount;
             $('#info_remaining_stock').text(remaining);
 
@@ -859,9 +1096,18 @@
             }
 
             let itemName = $('#info_item_name').text();
-            let totalQty = $('#unitsTable tbody tr').length;
+            let totalQty = 0;
+            $('#unitsTable tbody .pcs-to-issue-input').each(function() {
+                totalQty += parseInt($(this).val()) || 0;
+            });
             let receiverName = $('#user_id option:selected').text();
             let remarks = $('#remarks').val() || 'None';
+
+            const requestQuantityUsed = requestIssueMode === 'BOX' ? $('#unitsTable tbody tr').length : totalQty;
+            if (requestQuantityLimit !== null && requestQuantityUsed > requestQuantityLimit) {
+                toastr.error(`Total quantity cannot exceed the remaining approved request balance of ${requestQuantityLimit} ${requestIssueMode === 'BOX' ? 'box(es)' : 'PC/S'}.`);
+                return;
+            }
 
             let content = `
                 <div class="mb-2"><strong>Item:</strong> ${itemName}</div>
@@ -902,7 +1148,7 @@
                 data: formData,
                 success: function(response) {
                     // toastr.success(response.success);
-                    window.location.href = "{{ route('stock-out.index') }}";
+                    window.location.href = response.redirect_url || "{{ route('stock-out.index') }}";
                 },
                 error: function(xhr) {
                     let errors = xhr.responseJSON.errors;

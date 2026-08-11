@@ -43,14 +43,14 @@ class DashboardController extends Controller
 
         // 1. Summary Cards
         $totalItems = $itemsQuery->count();
-        $totalStockQuantity = $itemsQuery->sum('current_quantity');
+        $inventoryItems = $this->withLiveStock(clone $itemsQuery)->get();
+        $totalStockQuantity = (int) $inventoryItems->sum('available_units');
+        $totalStockPieces = (int) $inventoryItems->sum('available_pieces');
 
-        // Low Stock: Current < Reorder AND Current > 0 (assuming 0 is Out of Stock)
-        $lowStockCount = (clone $itemsQuery)->whereColumn('current_quantity', '<=', 'reorder_level')->where('current_quantity', '>', 0)->count();
-        $outOfStockCount = (clone $itemsQuery)->where('current_quantity', 0)->count();
+        $lowStockCount = $inventoryItems->filter(fn ($item) => $item->available_units > 0 && $item->available_units <= (int) $item->reorder_level)->count();
+        $outOfStockCount = $inventoryItems->where('available_units', 0)->count();
 
-        // Critical Stock: Items where Current Quantity <= Reorder Level (Low Stock + Out of Stock)
-        $criticalStockCount = (clone $itemsQuery)->whereColumn('current_quantity', '<=', 'reorder_level')->count();
+        $criticalStockCount = $inventoryItems->filter(fn ($item) => $item->available_units <= (int) $item->reorder_level)->count();
 
         // Total In/Out (based on transactions within date range)
         // Stock In: Count and group by date_created (distinct timestamps)
@@ -71,7 +71,7 @@ class DashboardController extends Controller
         }
 
         if ($categoryId) {
-            $issuancesQuery->whereHas('itemUnits.item', function ($q) use ($categoryId) {
+            $issuancesQuery->whereHas('stockTransactions.item', function ($q) use ($categoryId) {
                 $q->where('category_id', $categoryId);
             });
         }
@@ -102,10 +102,19 @@ class DashboardController extends Controller
         // Stock Level by Category
         $stockByCategory = Category::select('categories.category_id', 'categories.category_name')
             ->selectSub(function ($query) {
-                $query->from('items')
+                $query->from('item_units')
+                    ->join('items', 'item_units.item_id', '=', 'items.item_id')
                     ->whereColumn('items.category_id', 'categories.category_id')
-                    ->selectRaw('IFNULL(SUM(current_quantity), 0)');
+                    ->where('item_units.status', 1)
+                    ->selectRaw('COUNT(*)');
             }, 'total_qty')
+            ->selectSub(function ($query) {
+                $query->from('item_units')
+                    ->join('items', 'item_units.item_id', '=', 'items.item_id')
+                    ->whereColumn('items.category_id', 'categories.category_id')
+                    ->where('item_units.status', 1)
+                    ->selectRaw('COALESCE(SUM(COALESCE(item_units.pcs_per_unit, items.pcs_per_unit, 1)), 0)');
+            }, 'total_pcs')
             ->selectSub(function ($query) {
                 $query->from('item_units')
                     ->join('items', 'item_units.item_id', '=', 'items.item_id')
@@ -128,8 +137,8 @@ class DashboardController extends Controller
 
         $stockTrends = StockTransaction::select(
             DB::raw("$sqlDateFunc as month"),
-            DB::raw("SUM(CASE WHEN type = 'IN' THEN 1 ELSE 0 END) as stock_in"),
-            DB::raw("SUM(CASE WHEN type = 'OUT' THEN 1 ELSE 0 END) as stock_out")
+            DB::raw("SUM(CASE WHEN type = 'IN' THEN COALESCE(quantity, 1) ELSE 0 END) as stock_in"),
+            DB::raw("SUM(CASE WHEN type = 'OUT' THEN COALESCE(quantity, 1) ELSE 0 END) as stock_out")
         )
             ->when($categoryId, function ($q) use ($categoryId) {
                 $q->whereHas('item', function ($sq) use ($categoryId) {
@@ -152,7 +161,7 @@ class DashboardController extends Controller
         // Top 10 Most Used Items (Stock Out count)
         $topItems = StockTransaction::where('type', 'OUT')
             ->join('items', 'stock_transactions.item_id', '=', 'items.item_id')
-            ->select('items.item_name', DB::raw('count(*) as usage_count'))
+            ->select('items.item_name', DB::raw('SUM(COALESCE(stock_transactions.quantity, 1)) as usage_count'))
             ->when($startDate && $endDate, function ($q) use ($startDate, $endDate) {
                 $q->whereBetween('stock_transactions.date_created', [$startDate, $endDate]);
             })
@@ -165,11 +174,10 @@ class DashboardController extends Controller
             ->get();
 
         // 3. Low Stock Alert Panel
-        $lowStockItems = (clone $itemsQuery)
-            ->whereColumn('current_quantity', '<=', 'reorder_level')
-            ->orderBy('current_quantity', 'asc')
-            ->limit(10) // Limit for dashboard
-            ->get();
+        $lowStockItems = $inventoryItems
+            ->filter(fn ($item) => $item->available_units <= (int) $item->reorder_level)
+            ->sortBy('available_units')
+            ->take(10);
 
         // 4. Recent Activity
         $recentActivities = $transactionsQuery->with(['item', 'item.unit']) // item.unit is UOM
@@ -181,7 +189,7 @@ class DashboardController extends Controller
         $categories = Category::all();
 
         return view('dashboard', compact(
-            'totalItems', 'totalStockQuantity', 'lowStockCount', 'outOfStockCount',
+            'totalItems', 'totalStockQuantity', 'totalStockPieces', 'lowStockCount', 'outOfStockCount',
             'totalStockIn', 'totalStockOut', 'criticalStockCount',
             'activeBorrowingsCount', 'overdueBorrowingsCount',
             'damagedItemsCount',
@@ -205,7 +213,16 @@ class DashboardController extends Controller
         }
 
         $items = Item::where('category_id', $categoryId)
-            ->select('item_id', 'item_name', 'current_quantity')
+            ->select('items.item_id', 'items.item_name')
+            ->selectSub(function ($query) {
+                $query->from('item_units')->whereColumn('item_units.item_id', 'items.item_id')
+                    ->where('item_units.status', 1)->selectRaw('COUNT(*)');
+            }, 'available_units')
+            ->selectSub(function ($query) {
+                $query->from('item_units')->whereColumn('item_units.item_id', 'items.item_id')
+                    ->where('item_units.status', 1)
+                    ->selectRaw('COALESCE(SUM(COALESCE(item_units.pcs_per_unit, items.pcs_per_unit, 1)), 0)');
+            }, 'available_pieces')
             ->selectSub(function ($query) {
                 $query->from('item_units')
                     ->whereColumn('item_units.item_id', 'items.item_id')
@@ -218,5 +235,22 @@ class DashboardController extends Controller
             'category_name' => $category->category_name,
             'items' => $items,
         ]);
+    }
+
+    private function withLiveStock($query)
+    {
+        return $query->select('items.*')
+            ->selectSub(function ($subQuery) {
+                $subQuery->from('item_units')
+                    ->whereColumn('item_units.item_id', 'items.item_id')
+                    ->where('item_units.status', 1)
+                    ->selectRaw('COUNT(*)');
+            }, 'available_units')
+            ->selectSub(function ($subQuery) {
+                $subQuery->from('item_units')
+                    ->whereColumn('item_units.item_id', 'items.item_id')
+                    ->where('item_units.status', 1)
+                    ->selectRaw('COALESCE(SUM(COALESCE(item_units.pcs_per_unit, items.pcs_per_unit, 1)), 0)');
+            }, 'available_pieces');
     }
 }

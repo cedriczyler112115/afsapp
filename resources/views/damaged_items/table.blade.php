@@ -25,9 +25,9 @@
                 </td>
                 <td>{{ $issuance->receiver_name ?? 'N/A' }}</td>
                 <td>
-                    @if($issuance->itemUnits->isNotEmpty())
-                        {{ $issuance->itemUnits->first()->item->item_name }}
-                        @if($issuance->itemUnits->unique('item_id')->count() > 1)
+                    @if($issuance->damageTransactions->isNotEmpty())
+                        {{ $issuance->damageTransactions->first()->item->item_name }}
+                        @if($issuance->damageTransactions->unique('item_id')->count() > 1)
                             <small class="text-muted">(+ others)</small>
                         @endif
                     @else
@@ -35,17 +35,15 @@
                     @endif
                 </td>
                 <td>
-                    @if($issuance->itemUnits->isNotEmpty() && $issuance->itemUnits->first()->item->category)
-                        {{ $issuance->itemUnits->first()->item->category->category_name }}
+                    @if($issuance->damageTransactions->isNotEmpty() && $issuance->damageTransactions->first()->item->category)
+                        {{ $issuance->damageTransactions->first()->item->category->category_name }}
                     @else
                         -
                     @endif
                 </td>
                 <td>
-                    <span class="badge bg-success">{{ $issuance->itemUnits->count() }}</span>
-                    @if($issuance->itemUnits->isNotEmpty() && $issuance->itemUnits->first()->item->unit)
-                        <small class="text-muted ms-1">{{ Str::plural($issuance->itemUnits->first()->item->unit->unit_name, $issuance->itemUnits->count()) }}</small>
-                    @endif
+                    <span class="badge bg-success">{{ $issuance->damageTransactions->count() }}</span>
+                    <small class="text-muted ms-1">record(s)</small>
                 </td>
                 <td>{{ optional($issuance->date_issued)->format('Y-m-d h:i A') ?? '-' }}</td>
                 <td>{{ Str::limit($issuance->remarks, 30) ?: '-' }}</td>

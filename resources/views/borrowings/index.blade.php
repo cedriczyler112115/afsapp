@@ -5,8 +5,8 @@
 @section('content')
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span>Borrowings</span>
-        <a href="{{ route('borrowings.create') }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> New Borrowing</a>
+        <span>Borrow Requests & Returns</span>
+        <a href="{{ route('borrowings.create') }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> New Borrow Request</a>
     </div>
     <div class="card-body p-2 p-md-3">
             <!-- Filters -->
@@ -45,7 +45,10 @@
                     <label for="status" class="form-label small mb-1">Status</label>
                     <select id="status" class="form-select form-select-sm select2">
                         <option value="">All Statuses</option>
+                        <option value="REQUESTED">Requested</option>
+                        <option value="RELEASED">Released / Awaiting Receipt</option>
                         <option value="BORROWED">Borrowed</option>
+                        <option value="RETURN_PENDING">Return Pending</option>
                         <option value="RETURNED">Returned</option>
                         <option value="OVERDUE">Overdue</option>
                         <option value="CANCELLED">Cancelled</option>

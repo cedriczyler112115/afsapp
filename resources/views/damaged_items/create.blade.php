@@ -21,6 +21,30 @@
     .collapsed .accordion-button-icon {
         transform: rotate(-90deg);
     }
+    .damaged-info-card .card-header {
+        padding-top: .55rem;
+        padding-bottom: .55rem;
+    }
+    .damaged-info-title {
+        font-size: .95rem;
+        line-height: 1.25;
+    }
+    .damaged-info-label {
+        font-size: .75rem;
+        line-height: 1.25;
+        letter-spacing: .02em;
+    }
+    .damaged-info-value {
+        font-size: .9rem;
+        line-height: 1.4;
+        font-weight: 400 !important;
+    }
+    .damaged-info-toggle .accordion-button-icon {
+        transform: rotate(-90deg);
+    }
+    .damaged-info-toggle.is-expanded .accordion-button-icon {
+        transform: rotate(0deg);
+    }
 </style>
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center bg-danger text-white">
@@ -71,72 +95,72 @@
             </div>
 
             <!-- Item Info (Read-only) -->
-            <div class="card mb-4 border-0 shadow-sm">
-                <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center collapsed" data-bs-toggle="collapse" data-bs-target="#itemInfoCollapse" style="cursor: pointer;">
-                    <h6 class="mb-0 text-secondary fw-bold"><i class="bi bi-info-circle me-2"></i>Item Information</h6>
+            <div class="card mb-4 border-0 shadow-sm damaged-info-card">
+                <button type="button" class="card-header bg-light d-flex justify-content-between align-items-center border-0 w-100 text-start damaged-info-toggle" aria-expanded="false" aria-controls="itemInfoCollapse" style="cursor: pointer;">
+                    <span class="mb-0 text-secondary fw-semibold damaged-info-title"><i class="bi bi-info-circle me-2"></i>Item Information</span>
                     <i class="bi bi-chevron-down accordion-button-icon"></i>
-                </div>
-                <div id="itemInfoCollapse" class="collapse">
+                </button>
+                <div id="itemInfoCollapse" class="d-none">
                     <div class="card-body">
                         <div class="row g-4">
                         <!-- Item Name -->
                         <div class="col-12 col-md-4">
                             <div class="d-flex align-items-center mb-1 text-muted">
                                 <i class="bi bi-box-seam me-2"></i>
-                                <small class="fw-bold text-uppercase">Item Name</small>
+                                <small class="fw-semibold text-uppercase damaged-info-label">Item Name</small>
                             </div>
                             <div class="ps-4">
-                                <h6 class="fw-bold text-dark mb-0" id="info_item_name">-</h6>
+                                <div class="text-dark mb-0 damaged-info-value" id="info_item_name">-</div>
                             </div>
                         </div>
                         <!-- SKU -->
                         <div class="col-12 col-md-4">
                             <div class="d-flex align-items-center mb-1 text-muted">
                                 <i class="bi bi-upc-scan me-2"></i>
-                                <small class="fw-bold text-uppercase">SKU</small>
+                                <small class="fw-semibold text-uppercase damaged-info-label">SKU</small>
                             </div>
                             <div class="ps-4">
-                                <h6 class="fw-bold text-dark mb-0" id="info_sku">-</h6>
+                                <div class="text-dark mb-0 damaged-info-value" id="info_sku">-</div>
                             </div>
                         </div>
                         <!-- Category -->
                         <div class="col-12 col-md-4">
                             <div class="d-flex align-items-center mb-1 text-muted">
                                 <i class="bi bi-tags me-2"></i>
-                                <small class="fw-bold text-uppercase">Category</small>
+                                <small class="fw-semibold text-uppercase damaged-info-label">Category</small>
                             </div>
                             <div class="ps-4">
-                                <h6 class="fw-bold text-dark mb-0" id="info_category">-</h6>
+                                <div class="text-dark mb-0 damaged-info-value" id="info_category">-</div>
                             </div>
                         </div>
                         <!-- Unit -->
                         <div class="col-12 col-md-4">
                             <div class="d-flex align-items-center mb-1 text-muted">
                                 <i class="bi bi-rulers me-2"></i>
-                                <small class="fw-bold text-uppercase">Unit</small>
+                                <small class="fw-semibold text-uppercase damaged-info-label">Unit</small>
                             </div>
                             <div class="ps-4">
-                                <h6 class="fw-bold text-dark mb-0" id="info_unit">-</h6>
+                                <div class="text-dark mb-0 damaged-info-value" id="info_unit">-</div>
                             </div>
                         </div>
                         <!-- Current Quantity -->
                         <div class="col-12 col-md-4">
                             <div class="d-flex align-items-center mb-1 text-muted">
                                 <i class="bi bi-layers me-2"></i>
-                                <small class="fw-bold text-uppercase">Current Quantity</small>
+                                <small class="fw-semibold text-uppercase damaged-info-label">Current Quantity</small>
                             </div>
                             <div class="ps-4">
-                                <h6 class="fw-bold text-dark mb-0" id="info_current_quantity">-</h6>
+                                <div class="text-dark mb-0 damaged-info-value" id="info_current_quantity">-</div>
                             </div>
                         </div>
                         <!-- Remaining Stock -->
                         <div class="col-12 col-md-4">
                             <div class="d-flex align-items-center mb-1 text-muted">
                                 <i class="bi bi-calculator me-2"></i>
-                                <small class="fw-bold text-uppercase">REMAINING STOCK AFTER THIS REPORT</small>
+                                <small class="fw-semibold text-uppercase damaged-info-label">REMAINING STOCK AFTER THIS REPORT</small>
                             </div>
                             <div class="ps-4 d-flex align-items-center">
-                                <h6 class="fw-bold text-dark mb-0 me-2" id="info_remaining_stock">-</h6>
+                                <div class="text-dark mb-0 me-2 damaged-info-value" id="info_remaining_stock">-</div>
                                 <span class="badge bg-danger d-none blink-badge" id="zero_stock_badge">No Stock Left</span>
                             </div>
                         </div>
@@ -144,10 +168,10 @@
                         <div class="col-12">
                             <div class="d-flex align-items-center mb-1 text-muted">
                                 <i class="bi bi-file-text me-2"></i>
-                                <small class="fw-bold text-uppercase">Description</small>
+                                <small class="fw-semibold text-uppercase damaged-info-label">Description</small>
                             </div>
                             <div class="ps-4">
-                                <p class="text-secondary mb-0" id="info_description">-</p>
+                                <p class="text-secondary mb-0 damaged-info-value" id="info_description">-</p>
                             </div>
                         </div>
                     </div>
@@ -182,6 +206,10 @@
                             <th>Serial</th>
                             <th>Full Code</th>
                             <th>QR Code</th>
+                            <th class="text-nowrap">PC/S per Box</th>
+                            <th class="text-nowrap">Remaining PC/S</th>
+                            <th style="min-width:110px">Report By</th>
+                            <th style="min-width:110px">Damaged PC/S</th>
                             <th style="width: 50px;">Action</th>
                         </tr>
                     </thead>
@@ -218,6 +246,8 @@
                                 <th>Serial</th>
                                 <th>Full Code</th>
                                 <th>QR Code</th>
+                                <th class="text-center text-nowrap">PC/S per Box</th>
+                                <th class="text-center text-nowrap">Remaining PC/S per Box</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -266,6 +296,14 @@
         let unitIndex = 0;
         let addedUnitIds = [];
         let currentItemQuantity = 0;
+
+        $('.damaged-info-toggle').on('click', function() {
+            const isExpanded = $(this).attr('aria-expanded') === 'true';
+            $('#itemInfoCollapse').toggleClass('d-none', isExpanded);
+            $(this)
+                .attr('aria-expanded', String(!isExpanded))
+                .toggleClass('is-expanded', !isExpanded);
+        });
 
             $('#damage_photos').on('change', function() {
                 let preview = $('#damage_photos_preview');
@@ -390,6 +428,8 @@
                                 <td>${unit.serial || '-'}</td>
                                 <td>${unit.full_code || '-'}</td>
                                 <td>${unit.qr_code || '-'}</td>
+                                <td class="text-center">${Number(unit.original_pcs_per_box || 0).toLocaleString()}</td>
+                                <td class="text-center fw-semibold">${Number(unit.remaining_pcs_per_box || 0).toLocaleString()}</td>
                             </tr>
                         `;
                         tbody.append(row);
@@ -551,6 +591,8 @@
 
             addedUnitIds.push(unit.id);
             unitIndex++;
+            const originalPcs = Number(unit.original_pcs_per_box || (unit.item && unit.item.pcs_per_unit) || unit.pcs_per_unit || 1);
+            const remainingPcs = Number(unit.remaining_pcs_per_box ?? unit.pcs_per_unit ?? originalPcs);
 
             let row = `
                 <tr id="row-${unit.id}">
@@ -561,6 +603,17 @@
                     </td>
                     <td>${unit.full_code || '-'}</td>
                     <td>${unit.qr_code || '-'}</td>
+                    <td class="text-center">${originalPcs.toLocaleString()}</td>
+                    <td class="text-center remaining-pcs">${remainingPcs.toLocaleString()}</td>
+                    <td>
+                        <select name="units[${unitIndex}][damage_mode]" class="form-select form-select-sm damage-mode" data-max="${remainingPcs}">
+                            <option value="BOX">Box</option>
+                            <option value="PCS">PC/S</option>
+                        </select>
+                    </td>
+                    <td>
+                        <input type="number" name="units[${unitIndex}][pcs_damaged]" class="form-control form-control-sm pcs-damaged" min="1" max="${remainingPcs}" value="${remainingPcs}" readonly required>
+                    </td>
                     <td class="text-center">
                         <button type="button" class="btn btn-danger btn-sm remove-unit" data-id="${unit.id}">
                             <i class="bi bi-trash"></i>
@@ -573,6 +626,23 @@
             $('#noRecordsFound').addClass('d-none');
             updateRemainingStock();
         }
+
+        $(document).on('change', '.damage-mode', function() {
+            const input = $(this).closest('tr').find('.pcs-damaged');
+            const max = Number($(this).data('max')) || 1;
+            if ($(this).val() === 'BOX') {
+                input.val(max).prop('readonly', true);
+            } else {
+                input.val(Math.min(Number(input.val()) || 1, max)).prop('readonly', false).trigger('focus');
+            }
+        });
+
+        $(document).on('input', '.pcs-damaged', function() {
+            const max = Number($(this).attr('max')) || 1;
+            let value = String($(this).val()).replace(/\D/g, '');
+            if (value !== '') value = String(Math.min(max, Math.max(1, Number(value))));
+            $(this).val(value);
+        });
 
         // Remove Unit
         $(document).on('click', '.remove-unit', function() {

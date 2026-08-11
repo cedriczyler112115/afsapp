@@ -25,7 +25,7 @@
                 @foreach($groupedUnits as $itemName => $units)
                     <div class="card mb-3">
                         <div class="card-header bg-light">
-                            <strong>Item:</strong> {{ $itemName }} <span class="badge bg-primary ms-2">{{ $units->count() }} {{ Str::plural($units->first()->item->unit->unit_name ?? 'Unit', $units->count()) }}</span>
+                            <strong>Item:</strong> {{ $itemName }} <span class="badge bg-primary ms-2">{{ $units->count() }} record(s)</span>
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
@@ -36,15 +36,23 @@
                                             <th>Serial</th>
                                             <th>Full Code</th>
                                             <th>QR Code</th>
+                                            <th class="text-nowrap">PC/S per Box</th>
+                                            <th class="text-nowrap">Reported By</th>
+                                            <th class="text-nowrap">Damaged PC/S</th>
+                                            <th class="text-nowrap">Remaining PC/S</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach($units as $unit)
+                                        @foreach($units as $damage)
                                             <tr>
                                                 <td>{{ $loop->iteration }}</td>
-                                                <td>{{ $unit->serial ?? '-' }}</td>
-                                                <td>{{ $unit->full_code ?? '-' }}</td>
-                                                <td>{{ $unit->qr_code ?? '-' }}</td>
+                                                <td>{{ $damage->unit->serial ?? '-' }}</td>
+                                                <td>{{ $damage->unit->full_code ?? '-' }}</td>
+                                                <td>{{ $damage->unit->qr_code ?? '-' }}</td>
+                                                <td>{{ number_format(max(1, (int) ($damage->item->pcs_per_unit ?? 1))) }}</td>
+                                                <td>{{ $damage->issue_mode === 'PCS' ? 'PC/S' : 'Box' }}</td>
+                                                <td>{{ number_format((int) $damage->quantity) }}</td>
+                                                <td>{{ number_format(max(0, (int) ($damage->pcs_after ?? 0))) }}</td>
                                             </tr>
                                         @endforeach
                                     </tbody>

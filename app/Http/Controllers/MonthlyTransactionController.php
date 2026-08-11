@@ -41,7 +41,8 @@ class MonthlyTransactionController extends Controller
                 'item:item_id,category_id,item_name,sku,unit_id',
                 'item.category',
                 'item.unit',
-                'unit:id,item_id,serial,full_code,issuance_id',
+                'unit:id,item_id,serial,full_code,issuance_id,pcs_per_unit',
+                'issuance.user:id,name',
                 'creator:id,name',
             ])
             ->whereYear('date_created', $year)
@@ -96,7 +97,8 @@ class MonthlyTransactionController extends Controller
                 'item:item_id,category_id,item_name,sku,unit_id',
                 'item.category',
                 'item.unit',
-                'unit:id,item_id,serial,full_code,issuance_id',
+                'unit:id,item_id,serial,full_code,issuance_id,pcs_per_unit',
+                'issuance.user:id,name',
                 'creator:id,name',
             ])
             ->whereYear('date_created', $year)
@@ -145,7 +147,9 @@ class MonthlyTransactionController extends Controller
             })
             ->get();
 
-        $issuanceIds = $transactions->pluck('unit.issuance_id')->filter()->unique()->values();
+        $issuanceIds = $transactions->pluck('issuance_id')
+            ->merge($transactions->pluck('unit.issuance_id'))
+            ->filter()->unique()->values();
         $issuances = Issuance::query()
             ->with('user:id,name')
             ->whereIn('id', $issuanceIds)
@@ -156,7 +160,7 @@ class MonthlyTransactionController extends Controller
             $transaction->setAttribute('party_name', null);
             $transaction->setAttribute('party_role', null);
             $transaction->setAttribute('source_reference', null);
-            $transaction->setAttribute('transaction_quantity', 1);
+            $transaction->setAttribute('transaction_quantity', max(1, (int) ($transaction->quantity ?? 1)));
 
             if ($transaction->type === 'BORROW') {
                 $record = $this->closestRecord($borrowings, $transaction, 'borrow_date', 'item_unit_id');
@@ -175,7 +179,7 @@ class MonthlyTransactionController extends Controller
                     $transaction->setAttribute('transaction_quantity', (int) $record->quantity ?: 1);
                 }
             } elseif (in_array($transaction->type, ['OUT', 'DAMAGED'], true)) {
-                $issuance = $issuances->get($transaction->unit?->issuance_id);
+                $issuance = $transaction->issuance ?: $issuances->get($transaction->issuance_id ?: $transaction->unit?->issuance_id);
                 if ($issuance) {
                     $transaction->setAttribute('party_name', $issuance->receiver_name ?: $issuance->user?->name);
                     $transaction->setAttribute('party_role', $transaction->type === 'DAMAGED' ? 'Reported/received by' : 'Requester / recipient');

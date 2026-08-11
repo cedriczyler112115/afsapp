@@ -250,7 +250,7 @@
                                 Bulk / non-serialized
                             @endif
                         </td>
-                        <td style="text-align: center;">{{ number_format($transaction->transaction_quantity) }}</td>
+                        <td style="text-align: center;">{{ number_format($transaction->transaction_quantity) }}@if($transaction->type === 'OUT')<br><small>PC/S · {{ ($transaction->issue_mode ?? 'BOX') === 'BOX' ? 'Box' : 'By piece' }}</small>@endif</td>
                         <td>
                             <div>{{ $transaction->party_name }}</div>
                             <small>{{ $transaction->party_role }}</small>

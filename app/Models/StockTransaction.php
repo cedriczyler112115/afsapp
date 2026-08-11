@@ -9,7 +9,12 @@ class StockTransaction extends Model
     protected $fillable = [
         'item_id',
         'unit_id',
+        'issuance_id',
         'type',
+        'quantity',
+        'issue_mode',
+        'pcs_before',
+        'pcs_after',
         'date_created',
         'created_by',
     ];
@@ -18,6 +23,9 @@ class StockTransaction extends Model
 
     protected $casts = [
         'date_created' => 'datetime',
+        'quantity' => 'integer',
+        'pcs_before' => 'integer',
+        'pcs_after' => 'integer',
     ];
 
     public function item()
@@ -33,5 +41,10 @@ class StockTransaction extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function issuance()
+    {
+        return $this->belongsTo(Issuance::class);
     }
 }

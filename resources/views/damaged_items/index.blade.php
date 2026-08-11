@@ -14,6 +14,9 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center bg-danger text-white">
         <span>Damaged & Unserviceable</span>
+        <a href="{{ route('damaged-items.create') }}" class="btn btn-primary btn-sm text-nowrap">
+            <i class="bi bi-plus-circle me-1"></i>Report Damage
+        </a>
     </div>
     <div class="card-body p-2 p-md-3">
         <div class="row g-2 mb-3 align-items-end">
@@ -69,10 +72,6 @@
                         </select>
                     </div>
 
-                    <a href="{{ route('damaged-items.create') }}" class="btn btn-primary btn-sm text-nowrap">
-                        <i class="bi bi-plus-circle me-1"></i>Report Damage
-                    </a>
-                    
                     <button type="button" id="print-issuances" class="btn btn-sm btn-success text-nowrap" disabled title="Print Selected">
                         <i class="bi bi-printer me-1"></i>Print
                     </button>

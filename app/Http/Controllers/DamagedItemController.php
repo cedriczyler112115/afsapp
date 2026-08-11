@@ -27,23 +27,16 @@ class DamagedItemController extends Controller
         $itemId = $request->input('item_id');
         $categoryId = $request->input('category_id');
 
-        // Start with Issuances that have damaged items (status = 2)
         $query = Issuance::select('issuances.*', 'users.name as receiver_name')
             ->leftJoin('users', 'issuances.user_id', '=', 'users.id')
-            ->whereHas('itemUnits', function ($q) {
-                $q->where('status', 2);
-            })
-            ->with(['itemUnits' => function ($q) {
-                // Eager load only the damaged units
-                $q->where('status', 2)->with(['item.unit', 'item.category']);
-            }, 'issuanceGroup']);
+            ->whereHas('damageTransactions')
+            ->with(['damageTransactions.item.unit', 'damageTransactions.item.category', 'damageTransactions.unit', 'issuanceGroup']);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('users.name', 'like', "%{$search}%")
-                    ->orWhereHas('itemUnits', function ($u) use ($search) {
-                        $u->where('status', 2)
-                            ->whereHas('item', function ($i) use ($search) {
+                    ->orWhereHas('damageTransactions', function ($u) use ($search) {
+                        $u->whereHas('item', function ($i) use ($search) {
                                 $i->where('item_name', 'like', "%{$search}%")
                                     ->orWhere('sku', 'like', "%{$search}%");
                             });
@@ -56,31 +49,18 @@ class DamagedItemController extends Controller
         }
 
         if ($itemId) {
-            $query->whereHas('itemUnits', function ($q) use ($itemId) {
-                $q->where('status', 2)->where('item_id', $itemId);
-            });
+            $query->whereHas('damageTransactions', fn ($q) => $q->where('item_id', $itemId));
         }
 
         if ($categoryId) {
-            $query->whereHas('itemUnits.item', function ($q) use ($categoryId) {
+            $query->whereHas('damageTransactions.item', function ($q) use ($categoryId) {
                 $q->where('category_id', $categoryId);
             });
         }
 
-        if ($itemId) {
-            $query->with(['itemUnits' => function ($q) use ($itemId) {
-                $q->where('status', 2)
-                    ->where('item_id', $itemId)
-                    ->with(['item.unit', 'item.category']);
-            }]);
-        }
-
-        // Calculate Overall Total Units based on filter (only status = 2)
         $countQuery = clone $query;
         $issuanceIds = $countQuery->pluck('issuances.id');
-        $overallTotalUnits = ItemUnit::whereIn('issuance_id', $issuanceIds)
-            ->where('status', 2)
-            ->count();
+        $overallTotalUnits = StockTransaction::whereIn('issuance_id', $issuanceIds)->where('type', 'DAMAGED')->count();
 
         $issuances = $query->orderBy('issuances.date_issued', 'desc')
             ->paginate($perPage)
@@ -113,11 +93,8 @@ class DamagedItemController extends Controller
 
     public function show($id)
     {
-        $issuance = Issuance::with(['user', 'itemUnits.item.category', 'itemUnits.item.unit'])->findOrFail($id);
-
-        $groupedUnits = $issuance->itemUnits->groupBy(function ($unit) {
-            return $unit->item->item_name;
-        });
+        $issuance = Issuance::with(['user', 'damageTransactions.item.category', 'damageTransactions.item.unit', 'damageTransactions.unit'])->findOrFail($id);
+        $groupedUnits = $issuance->damageTransactions->groupBy(fn ($transaction) => $transaction->item->item_name);
 
         $damagePhotos = collect($issuance->damage_photos_path ?? [])
             ->filter()
@@ -150,10 +127,17 @@ class DamagedItemController extends Controller
 
     public function getAvailableUnits($item_id)
     {
+        $originalPcsPerBox = max(1, (int) (Item::where('item_id', $item_id)->value('pcs_per_unit') ?? 1));
         $units = ItemUnit::where('item_id', $item_id)
             ->where('status', 1)
-            ->select('id', 'serial', 'full_code', 'qr_code')
-            ->get();
+            ->select('id', 'serial', 'full_code', 'qr_code', 'pcs_per_unit')
+            ->get()
+            ->map(function ($unit) use ($originalPcsPerBox) {
+                $unit->original_pcs_per_box = $originalPcsPerBox;
+                $unit->remaining_pcs_per_box = max(0, (int) ($unit->pcs_per_unit ?? $originalPcsPerBox));
+
+                return $unit;
+            });
 
         return response()->json($units);
     }
@@ -196,6 +180,10 @@ class DamagedItemController extends Controller
                 $statusLabel = 'Already Issued (Out)';
             } elseif ($unit->status == 2) {
                 $statusLabel = 'Already Marked Damaged';
+            } elseif ($unit->status == 3) {
+                $statusLabel = 'Currently Borrowed';
+            } elseif ($unit->status == 4) {
+                $statusLabel = 'Reported Lost';
             }
 
             return response()->json([
@@ -203,6 +191,10 @@ class DamagedItemController extends Controller
                 'message' => "Unit is not available for reporting. Status: $statusLabel",
             ]);
         }
+
+        $unit->load('item');
+        $unit->original_pcs_per_box = max(1, (int) ($unit->item->pcs_per_unit ?? 1));
+        $unit->remaining_pcs_per_box = max(0, (int) ($unit->pcs_per_unit ?? $unit->original_pcs_per_box));
 
         return response()->json(['success' => true, 'unit' => $unit]);
     }
@@ -213,6 +205,8 @@ class DamagedItemController extends Controller
             'item_id' => 'required|exists:items,item_id',
             'units' => 'required|array|min:1',
             'units.*.unit_id' => 'required|exists:item_units,id',
+            'units.*.damage_mode' => 'required|in:BOX,PCS',
+            'units.*.pcs_damaged' => 'required|integer|min:1',
             'remarks' => 'nullable|string',
             'damage_photos' => 'nullable|array',
             'damage_photos.*' => 'file|image|max:10240',
@@ -222,20 +216,11 @@ class DamagedItemController extends Controller
 
         try {
             $itemId = $request->item_id;
-            $unitIds = [];
-            foreach ($request->units as $unit) {
-                if (isset($unit['unit_id']) && $unit['unit_id']) {
-                    $unitIds[] = $unit['unit_id'];
-                }
-            }
+            $requestedUnits = collect($request->units)->keyBy(fn ($unit) => (int) $unit['unit_id']);
+            $unitIds = $requestedUnits->keys()->all();
 
             if (empty($unitIds)) {
                 throw new \Exception('No valid units selected.');
-            }
-
-            $count = ItemUnit::whereIn('id', $unitIds)->where('status', 1)->count();
-            if ($count !== count($unitIds)) {
-                throw new \Exception('One or more selected units are no longer available.');
             }
 
             if ($request->hasFile('damage_photos')) {
@@ -248,7 +233,12 @@ class DamagedItemController extends Controller
                 }
             }
 
-            $issuance = DB::transaction(function () use ($request, $itemId, $unitIds, $storedPhotoPaths) {
+            $issuance = DB::transaction(function () use ($request, $itemId, $unitIds, $requestedUnits, $storedPhotoPaths) {
+                $item = Item::where('item_id', $itemId)->lockForUpdate()->firstOrFail();
+                $units = ItemUnit::whereIn('id', $unitIds)->where('item_id', $itemId)->lockForUpdate()->get()->keyBy('id');
+                if ($units->count() !== count($unitIds) || $units->contains(fn ($unit) => (int) $unit->status !== 1)) {
+                    throw new \Exception('One or more selected units are no longer available.');
+                }
                 $issuance = Issuance::create([
                     'user_id' => Auth::id(),
                     'receiver_name' => Auth::user()->name,
@@ -257,22 +247,38 @@ class DamagedItemController extends Controller
                     'date_issued' => now(),
                 ]);
 
-                ItemUnit::whereIn('id', $unitIds)->update([
-                    'status' => 2,
-                    'issuance_id' => $issuance->id,
-                ]);
-
+                $depletedBoxes = 0;
                 foreach ($unitIds as $unitId) {
+                    $unit = $units->get($unitId);
+                    $selection = $requestedUnits->get($unitId);
+                    $mode = $selection['damage_mode'];
+                    $pcsBefore = max(1, (int) ($unit->pcs_per_unit ?? $item->pcs_per_unit ?? 1));
+                    $pcsDamaged = $mode === 'BOX' ? $pcsBefore : (int) $selection['pcs_damaged'];
+                    if ($pcsDamaged > $pcsBefore) {
+                        throw new \Exception("Damaged PC/S for {$unit->full_code} cannot exceed {$pcsBefore} remaining PC/S.");
+                    }
+                    $pcsAfter = $pcsBefore - $pcsDamaged;
+                    $unit->pcs_per_unit = $pcsAfter;
+                    if ($pcsAfter === 0) {
+                        $unit->status = 2;
+                        $unit->issuance_id = $issuance->id;
+                        $depletedBoxes++;
+                    }
+                    $unit->save();
                     StockTransaction::create([
                         'item_id' => $itemId,
                         'unit_id' => $unitId,
+                        'issuance_id' => $issuance->id,
                         'type' => 'DAMAGED',
+                        'quantity' => $pcsDamaged,
+                        'issue_mode' => $mode,
+                        'pcs_before' => $pcsBefore,
+                        'pcs_after' => $pcsAfter,
                         'date_created' => now(),
                         'created_by' => Auth::id(),
                     ]);
                 }
-
-                Item::where('item_id', $itemId)->decrement('current_quantity', count($unitIds));
+                if ($depletedBoxes > 0) $item->decrement('current_quantity', $depletedBoxes);
 
                 return $issuance;
             });
@@ -293,7 +299,7 @@ class DamagedItemController extends Controller
     public function preview(Request $request)
     {
         $ids = $request->input('ids', []);
-        $issuances = Issuance::with(['user', 'itemUnits.item.category', 'itemUnits.item.unit'])
+        $issuances = Issuance::with(['user', 'damageTransactions.item.category', 'damageTransactions.unit'])
             ->whereIn('id', $ids)
             ->orderBy('date_issued')
             ->get();
@@ -336,7 +342,7 @@ class DamagedItemController extends Controller
 
     public function print($id)
     {
-        $group = IssuanceGroup::with(['issuances.user', 'issuances.itemUnits.item'])->findOrFail($id);
+        $group = IssuanceGroup::with(['issuances.user', 'issuances.damageTransactions.item.category', 'issuances.damageTransactions.unit'])->findOrFail($id);
 
         return view('damaged_items.print', compact('group'));
     }
