@@ -81,6 +81,8 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureProfileIsComplete::class])
     Route::resource('unit_of_measures', UnitOfMeasureController::class);
     Route::resource('items', ItemController::class);
     Route::get('stock-in', [StockInController::class, 'index'])->name('stock-in.index');
+    // Backward-compatible alias for stale compiled views on shared hosting.
+    Route::get('stock-in', [StockInController::class, 'index'])->name('stock-in.index');
     Route::get('stock-in/create', [StockInController::class, 'create'])->name('stock-in.create');
     Route::post('stock-in/store', [StockInController::class, 'store'])->name('stock-in.store');
     Route::get('stock-in/edit/{item_id}', [StockInController::class, 'edit'])->name('stock-in.edit');
