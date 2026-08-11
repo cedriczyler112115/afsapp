@@ -84,7 +84,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureProfileIsComplete::class])
     // Backward-compatible alias for stale compiled views on shared hosting.
     // A distinct URI is required because Laravel replaces routes that share the
     // same HTTP method and URI, even when their names differ.
-    Route::redirect('stock-in/legacy-index123', '/stock-in')->name('stock-in.index123');
+    Route::redirect('stock-in/legacy-index', '/stock-in')->name('stock-in.index');
     Route::get('stock-in/create', [StockInController::class, 'create'])->name('stock-in.create');
     Route::post('stock-in/store', [StockInController::class, 'store'])->name('stock-in.store');
     Route::get('stock-in/edit/{item_id}', [StockInController::class, 'edit'])->name('stock-in.edit');
