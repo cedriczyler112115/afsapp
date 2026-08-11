@@ -109,7 +109,7 @@ class OAuthController extends Controller
                 // Cache for 5 minutes (300 seconds)
                 Cache::put('google_auth_'.$desktopAuthKey, $userPayload, 300);
 
-                return response()->html('<!DOCTYPE html>
+                $html = '<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
@@ -129,7 +129,12 @@ class OAuthController extends Controller
         <button onclick="window.close()" class="btn btn-primary w-100">Close Browser Tab</button>
     </div>
 </body>
-</html>');
+</html>';
+
+                return response($html, 200, [
+                    'Content-Type' => 'text/html; charset=UTF-8',
+                    'Cache-Control' => 'no-store, private',
+                ]);
             }
 
             return redirect()->route('dashboard');
