@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -29,6 +31,11 @@ class AppServiceProvider extends ServiceProvider
             $appUrl = rtrim((string) config('app.url'), '/');
             if ($appUrl !== '') {
                 URL::forceRootUrl($appUrl);
+            }
+
+            if (! Cache::has('afs_view_cache_cleared')) {
+                Artisan::call('view:clear');
+                Cache::put('afs_view_cache_cleared', true, now()->addMinutes(30));
             }
         }
     }
