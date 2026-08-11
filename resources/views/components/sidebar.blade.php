@@ -181,7 +181,7 @@
           $canProcessSupplyRequests = (int) $sidebarUser->level_id === 1 || $sidebarUser->hasSidebarAccess('stock-out.index');
           $pendingSupplyRequests = 0;
           $pendingBorrowRequests = 0;
-          if (\Illuminate\Support\Facades\Schema::hasTable('supply_requests')) {
+          if (\Illuminate\Support\Facades\Route::has('supply-requests.index') && \Illuminate\Support\Facades\Schema::hasTable('supply_requests')) {
               $pendingSupplyRequestQuery = \App\Models\SupplyRequest::where('status', 'PENDING');
               if (! $canProcessSupplyRequests) {
                   $pendingSupplyRequestQuery->where('requester_id', $sidebarUser->id);
@@ -197,6 +197,7 @@
               $pendingBorrowRequests = $pendingBorrowRequestQuery->count();
           }
         @endphp
+        @if(\Illuminate\Support\Facades\Route::has('supply-requests.index'))
         <a class="nav-link-custom supply-request-link @if(request()->routeIs('supply-requests.*')) active @endif" href="{{ route('supply-requests.index') }}" title="Supply Requests{{ $pendingSupplyRequests ? ' - '.$pendingSupplyRequests.' pending' : '' }}">
           <i class="bi bi-clipboard-check me-2"></i>
           <span class="sidebar-text">Supplies Request</span>
@@ -204,6 +205,7 @@
             <span class="badge bg-danger supply-request-badge" aria-label="{{ $pendingSupplyRequests }} pending supply requests">{{ $pendingSupplyRequests > 99 ? '99+' : $pendingSupplyRequests }}</span>
           @endif
         </a>
+        @endif
         @if(Auth::user()->hasSidebarAccess('stock-in.index'))
         <a class="nav-link-custom @if(request()->routeIs('stock-in.*')) active @endif" href="{{ route('stock-in.index') }}" title="Stock In (Receiving)">
           <i class="bi bi-box-arrow-in-down me-2"></i>

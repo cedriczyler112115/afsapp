@@ -7,6 +7,29 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
 
+$requiredCachedRoutes = [
+    'supply-requests.index',
+    'borrowings.index',
+    'damaged-items.index',
+];
+
+// Shared-hosting uploads can leave an old Laravel route cache behind. Remove
+// only a stale generated route-cache file so the current routes/web.php is
+// loaded on this request; a subsequent deployment optimization may rebuild it.
+foreach (glob(__DIR__.'/cache/routes-*.php') ?: [] as $cachedRouteFile) {
+    $cachedRoutes = @file_get_contents($cachedRouteFile);
+    if ($cachedRoutes === false) {
+        continue;
+    }
+
+    foreach ($requiredCachedRoutes as $requiredRoute) {
+        if (! str_contains($cachedRoutes, $requiredRoute)) {
+            @unlink($cachedRouteFile);
+            break;
+        }
+    }
+}
+
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
