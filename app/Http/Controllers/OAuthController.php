@@ -7,12 +7,21 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 
 class OAuthController extends Controller
 {
     public function redirectToGoogle(Request $request)
     {
+        if (! config('services.google.client_id') || ! config('services.google.client_secret')) {
+            Log::error('Google OAuth credentials are missing from the application configuration.');
+
+            return redirect()->route('login')->withErrors([
+                'email' => 'Google login is not configured on this server. Please contact the administrator.',
+            ], 'login');
+        }
+
         $authKey = $request->query('auth_key');
         if ($authKey) {
             session(['desktop_auth_key' => $authKey]);
@@ -125,9 +134,24 @@ class OAuthController extends Controller
 
             return redirect()->route('dashboard');
 
-        } catch (\Exception $e) {
-            Log::error('Google OAuth Error', ['error' => $e->getMessage()]);
-            return redirect()->route('login')->withErrors(['email' => 'Unable to authenticate with Google. Please try again.'], 'login');
+        } catch (\Throwable $e) {
+            $reference = Str::upper(Str::random(8));
+
+            Log::error('Google OAuth callback failed', [
+                'reference' => $reference,
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+                'redirect_uri' => config('services.google.redirect'),
+                'request_url' => $request->fullUrlWithoutQuery(['code']),
+            ]);
+
+            $message = match (true) {
+                str_contains(strtolower($e->getMessage()), 'invalid_state') => 'Google login session expired or could not be verified. Please try again.',
+                str_contains(strtolower($e->getMessage()), 'access_denied') => 'Google login was cancelled or access was denied.',
+                default => "Unable to authenticate with Google. Error reference: {$reference}",
+            };
+
+            return redirect()->route('login')->withErrors(['email' => $message], 'login');
         }
     }
 
