@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
@@ -29,6 +30,7 @@ class OAuthController extends Controller
             session(['desktop_auth_key' => $authKey]);
             return Socialite::driver('google')
                 ->stateless()
+                ->redirectUrl($this->googleRedirectUrl($request))
                 ->with(['state' => 'desktop_' . $authKey])
                 ->redirect();
         }
@@ -41,6 +43,7 @@ class OAuthController extends Controller
 
         return Socialite::driver('google')
             ->stateless()
+            ->redirectUrl($this->googleRedirectUrl($request))
             ->with(['state' => 'web_'.$state])
             ->redirect();
     }
@@ -84,6 +87,30 @@ class OAuthController extends Controller
 
             $googleUser = Socialite::driver('google')->stateless()->user();
 
+            $userColumns = array_flip(Schema::getColumnListing('users'));
+            if (! isset($userColumns['google_id'])) {
+                throw new \RuntimeException('The users.google_id column is missing. Run the Google OAuth database migrations.');
+            }
+
+            // Some shared-hosting databases may still be on an older users schema.
+            // Persist every Google profile field supported by that database while
+            // keeping google_id as the only required OAuth linkage column.
+            $googleProfile = [
+                'google_id' => $googleUser->getId(),
+            ];
+
+            if (isset($userColumns['google_name'])) {
+                $googleProfile['google_name'] = $googleUser->getName();
+            }
+
+            if (isset($userColumns['google_email'])) {
+                $googleProfile['google_email'] = $googleUser->getEmail();
+            }
+
+            if (isset($userColumns['google_avatar'])) {
+                $googleProfile['google_avatar'] = $googleUser->getAvatar();
+            }
+
             // First try to find the user by their Google ID
             $user = User::where('google_id', $googleUser->getId())->first();
 
@@ -93,28 +120,27 @@ class OAuthController extends Controller
             }
 
             if ($user) {
-                // Update existing user with google_id and other details
-                $user->update([
-                    'google_id' => $googleUser->getId(),
-                    'google_name' => $googleUser->getName(),
-                    'google_email' => $googleUser->getEmail(),
-                ]);
+                $user->update($googleProfile);
             } else {
-                // Create a new user with default 'approve' fields
-                $user = User::create([
+                $newUser = array_merge([
                     'name' => $googleUser->getName(),
                     'email' => $googleUser->getEmail(),
-                    'google_id' => $googleUser->getId(),
-                    'google_name' => $googleUser->getName(),
-                    'google_email' => $googleUser->getEmail(),
-                    'is_status' => 1, // 1 = approve
-                    'password' => null, // Oauth user
-                ]);
+                    'password' => null,
+                ], $googleProfile);
+
+                if (isset($userColumns['is_status'])) {
+                    $newUser['is_status'] = 1;
+                }
+
+                $user = User::create($newUser);
             }
 
-            Auth::login($user, true);
+            // Do not force a remember token here. Legacy/imported users tables on
+            // shared hosting may not have remember_token, while the normal session
+            // is sufficient for completing Google authentication.
+            Auth::login($user);
 
-            if ((int) $user->is_status === 0) {
+            if (isset($userColumns['is_status']) && (int) $user->is_status === 0) {
                 Auth::logout();
                 return redirect()->route('login')->withErrors(['email' => 'Your account is pending approval. Please wait for activation or configure your organization details.'], 'login');
             }
@@ -180,6 +206,9 @@ class OAuthController extends Controller
             $message = match (true) {
                 $e instanceof InvalidStateException => 'Google login session expired or could not be verified. Please try again.',
                 str_contains(strtolower($e->getMessage()), 'access_denied') => 'Google login was cancelled or access was denied.',
+                str_contains(strtolower($e->getMessage()), 'google oauth database migrations')
+                    || str_contains(strtolower($e->getMessage()), 'unknown column')
+                    || str_contains(strtolower($e->getMessage()), 'base table or view not found') => 'Google login database setup is incomplete. Please run the server migrations.',
                 default => "Unable to authenticate with Google. Error reference: {$reference}",
             };
 
@@ -211,5 +240,12 @@ class OAuthController extends Controller
             'success' => false,
             'message' => 'Pending browser authentication...',
         ]);
+    }
+
+    private function googleRedirectUrl(Request $request): string
+    {
+        $baseUrl = rtrim($request->getSchemeAndHttpHost().$request->getBaseUrl(), '/');
+
+        return $baseUrl.'/auth/google/callback';
     }
 }
