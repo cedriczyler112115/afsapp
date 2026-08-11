@@ -18,7 +18,10 @@ class StockInController extends Controller
      */
     public function index(Request $request)
     {
-        $perPage = $request->input('per_page', 10);
+        $perPage = (int) $request->input('per_page', 10);
+        if (! in_array($perPage, [10, 25, 50], true)) {
+            $perPage = 10;
+        }
         $search = $request->input('search');
         $categoryId = $request->input('category_id');
         $itemId = $request->input('item_id');
@@ -79,7 +82,20 @@ class StockInController extends Controller
 
         $overallTotalQuantity = $totalQuery->count();
 
-        $stockTransactions = $query->groupBy('items.item_id')
+        // Hostinger enables MySQL's ONLY_FULL_GROUP_BY mode. Every selected
+        // non-aggregate column must therefore be included in GROUP BY.
+        $stockTransactions = $query->groupBy(
+            'items.item_id',
+            'items.item_name',
+            'categories.category_name',
+            'items.sku',
+            'items.category_id',
+            'items.unit_id',
+            'items.reorder_level',
+            'items.description',
+            'items.create_by',
+            'items.date_created'
+        )
             ->orderBy('items.create_by', 'desc')
             ->paginate($perPage)
             ->appends([
