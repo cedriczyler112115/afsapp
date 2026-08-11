@@ -42,7 +42,7 @@
                             <thead class="table-light">
                                 <tr>
                                     <th class="text-center" style="width: 50px;">
-                                        <input type="checkbox" id="select-all-units" class="form-check-input">
+                                        <input type="checkbox" id="select-all-units" class="form-check-input table-header-checkbox">
                                     </th>
                                     <th>Serial</th>
                                     <th>Full Code</th>
@@ -135,7 +135,7 @@
                             const row = `
                                 <tr>
                                     <td class="text-center">
-                                        <input type="checkbox" name="item_unit_ids[]" value="${unit.id}" class="unit-checkbox form-check-input">
+                                        <input type="checkbox" name="item_unit_ids[]" value="${unit.id}" class="unit-checkbox form-check-input table-data-checkbox">
                                     </td>
                                     <td>${unit.serial || '-'}</td>
                                     <td>${unit.full_code || '-'}</td>

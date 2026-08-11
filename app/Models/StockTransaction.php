@@ -29,4 +29,9 @@ class StockTransaction extends Model
     {
         return $this->belongsTo(ItemUnit::class, 'unit_id', 'id');
     }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

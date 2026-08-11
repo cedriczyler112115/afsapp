@@ -32,7 +32,7 @@
 
 
                 <div class="col-md-2">
-                    <label class="form-label">Document From <span class="text-danger ms-1" aria-hidden="true">*</span><span class="visually-hidden">required</span></label>
+                    <label class="form-label">Document Returned From <span class="text-danger ms-1" aria-hidden="true">*</span><span class="visually-hidden">required</span></label>
                     @php $senderType = (string) old('document_from_type', 'section'); @endphp
                     <x-oval-radio-group
                         name="document_from_type"

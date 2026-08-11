@@ -191,6 +191,8 @@
         $(document).on('click', '.delete-unit', function() {
             let id = $(this).data('id');
             $.confirm({
+                draggable: true,
+                dragWindowBorder: false,
                 title: 'Confirm Delete',
                 content: 'Are you sure you want to delete this unit?',
                 draggable: true,

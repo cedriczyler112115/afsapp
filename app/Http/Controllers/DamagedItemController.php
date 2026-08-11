@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class DamagedItemController extends Controller
 {
@@ -118,10 +119,20 @@ class DamagedItemController extends Controller
             return $unit->item->item_name;
         });
 
+        $damagePhotos = collect($issuance->damage_photos_path ?? [])
+            ->filter()
+            ->map(function ($path) {
+                return [
+                    'path' => $path,
+                    'url' => asset('storage/' . ltrim($path, '/')),
+                ];
+            })
+            ->values();
+
         return response()->json([
             'issuance' => $issuance,
             'groupedUnits' => $groupedUnits,
-            'html' => view('damaged_items.show_modal', compact('issuance', 'groupedUnits'))->render(),
+            'html' => view('damaged_items.show_modal', compact('issuance', 'groupedUnits', 'damagePhotos'))->render(),
         ]);
     }
 
@@ -203,12 +214,14 @@ class DamagedItemController extends Controller
             'units' => 'required|array|min:1',
             'units.*.unit_id' => 'required|exists:item_units,id',
             'remarks' => 'nullable|string',
+            'damage_photos' => 'nullable|array',
+            'damage_photos.*' => 'file|image|max:10240',
         ]);
 
-        DB::beginTransaction();
+        $storedPhotoPaths = [];
+
         try {
             $itemId = $request->item_id;
-            // Extract unit_ids
             $unitIds = [];
             foreach ($request->units as $unit) {
                 if (isset($unit['unit_id']) && $unit['unit_id']) {
@@ -220,47 +233,58 @@ class DamagedItemController extends Controller
                 throw new \Exception('No valid units selected.');
             }
 
-            // Verify availability
             $count = ItemUnit::whereIn('id', $unitIds)->where('status', 1)->count();
             if ($count !== count($unitIds)) {
                 throw new \Exception('One or more selected units are no longer available.');
             }
 
-            // Create Issuance Record (Report Damage)
-            // Using Auth::id() as user_id since there is no receiver
-            $issuance = Issuance::create([
-                'user_id' => Auth::id(),
-                'receiver_name' => Auth::user()->name, // Or maybe 'N/A' or 'Internal'? StockOutController sets this to user->name.
-                'remarks' => $request->remarks,
-                'date_issued' => now(),
-            ]);
-
-            // Update status to 2 (Damaged) and set issuance_id
-            ItemUnit::whereIn('id', $unitIds)->update([
-                'status' => 2,
-                'issuance_id' => $issuance->id,
-            ]);
-
-            // Create Transactions
-            foreach ($unitIds as $unitId) {
-                StockTransaction::create([
-                    'item_id' => $itemId,
-                    'unit_id' => $unitId,
-                    'type' => 'DAMAGED', // Distinct type for tracking
-                    'date_created' => now(),
-                    'created_by' => Auth::id(),
-                ]);
+            if ($request->hasFile('damage_photos')) {
+                foreach ($request->file('damage_photos') as $photo) {
+                    if (! $photo) {
+                        continue;
+                    }
+                    $filename = now()->format('YmdHis') . '_' . uniqid() . '_' . preg_replace('/[^A-Za-z0-9._-]/', '_', $photo->getClientOriginalName());
+                    $storedPhotoPaths[] = $photo->storeAs('damaged_items', $filename, 'public');
+                }
             }
 
-            // Update Item Quantity
-            Item::where('item_id', $itemId)->decrement('current_quantity', count($unitIds));
+            $issuance = DB::transaction(function () use ($request, $itemId, $unitIds, $storedPhotoPaths) {
+                $issuance = Issuance::create([
+                    'user_id' => Auth::id(),
+                    'receiver_name' => Auth::user()->name,
+                    'remarks' => $request->remarks,
+                    'damage_photos_path' => $storedPhotoPaths ?: null,
+                    'date_issued' => now(),
+                ]);
 
-            DB::commit();
+                ItemUnit::whereIn('id', $unitIds)->update([
+                    'status' => 2,
+                    'issuance_id' => $issuance->id,
+                ]);
 
-            return response()->json(['success' => 'Damage report processed successfully.']);
+                foreach ($unitIds as $unitId) {
+                    StockTransaction::create([
+                        'item_id' => $itemId,
+                        'unit_id' => $unitId,
+                        'type' => 'DAMAGED',
+                        'date_created' => now(),
+                        'created_by' => Auth::id(),
+                    ]);
+                }
 
+                Item::where('item_id', $itemId)->decrement('current_quantity', count($unitIds));
+
+                return $issuance;
+            });
+
+            return response()->json([
+                'success' => 'Damage report processed successfully.',
+                'issuance_id' => $issuance->id,
+            ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            foreach ($storedPhotoPaths as $storedPath) {
+                Storage::disk('public')->delete($storedPath);
+            }
 
             return response()->json(['errors' => ['error' => [$e->getMessage()]]], 422);
         }

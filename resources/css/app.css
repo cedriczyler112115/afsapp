@@ -9,3 +9,457 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* --- Shadcn UI Design System Theme Variables & Overrides --- */
+
+:root {
+    --bg-page: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-header: #ffffff;
+    --text-primary: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    --table-tr-hover: #f8fafc;
+    --radius: 0.5rem;
+}
+
+.dark {
+    --bg-page: #030712; /* Slate-950 */
+    --bg-card: #0f172a; /* Slate-900 */
+    --bg-header: #0f172a;
+    --text-primary: #f8fafc;
+    --text-muted: #94a3b8;
+    --border-color: #1e293b;
+    --table-tr-hover: #1e293b;
+}
+
+body {
+    background-color: var(--bg-page) !important;
+    font-family: 'Instrument Sans', sans-serif !important;
+    font-size: 0.8125rem !important;
+    color: var(--text-primary) !important;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+.dark ::-webkit-scrollbar-thumb {
+    background: #334155;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Compact Tables */
+.table {
+    font-size: 0.775rem !important;
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100% !important;
+    margin-bottom: 0 !important;
+    zoom: 100% !important;
+    color: var(--text-primary) !important;
+}
+
+.table-striped>tbody>tr:nth-of-type(odd)>* {
+    background-color: transparent !important;
+    --bs-table-bg-type: transparent !important;
+    --bs-table-accent-bg: transparent !important;
+}
+
+.table-bordered,
+.table-bordered>:not(caption)>*,
+.table-bordered>:not(caption)>*>* {
+    border: none !important;
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+.table th {
+    background-color: var(--bg-page) !important;
+    color: var(--text-muted) !important;
+    font-weight: 500 !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    padding: 0.35rem 0.55rem !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    border-top: none !important;
+}
+
+.table td {
+    padding: 0.35rem 0.55rem !important;
+    vertical-align: middle !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+    background-color: var(--bg-card) !important;
+}
+
+.table tbody tr {
+    transition: background-color 0.1s ease-in-out;
+}
+
+.table tbody tr:hover td {
+    background-color: var(--table-tr-hover) !important;
+}
+
+/* Table Wrapper for Clean Round Border Grid */
+.table-responsive {
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius) !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    background-color: var(--bg-card) !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02) !important;
+    margin-bottom: 0.65rem !important;
+}
+
+
+/* Flat & Soft shadcn Badges */
+.badge {
+    font-size: 0.6875rem !important;
+    font-weight: 500 !important;
+    padding: 0.15rem 0.45rem !important;
+    border-radius: 9999px !important;
+    border: 1px solid transparent !important;
+}
+
+.bg-success {
+    background-color: #dcfce7 !important;
+    color: #166534 !important;
+    border: 1px solid #bbf7d0 !important;
+}
+.dark .bg-success {
+    background-color: rgba(22, 101, 52, 0.2) !important;
+    color: #4ade80 !important;
+    border: 1px solid rgba(74, 222, 128, 0.3) !important;
+}
+
+.bg-danger {
+    background-color: #fee2e2 !important;
+    color: #991b1b !important;
+    border: 1px solid #fecaca !important;
+}
+.dark .bg-danger {
+    background-color: rgba(153, 27, 27, 0.2) !important;
+    color: #f87171 !important;
+    border: 1px solid rgba(248, 113, 113, 0.3) !important;
+}
+
+.bg-warning {
+    background-color: #fef9c3 !important;
+    color: #854d0e !important;
+    border: 1px solid #fef08a !important;
+}
+.dark .bg-warning {
+    background-color: rgba(133, 77, 14, 0.2) !important;
+    color: #facc15 !important;
+    border: 1px solid rgba(250, 204, 21, 0.3) !important;
+}
+
+.bg-primary {
+    background-color: #dbeafe !important;
+    color: #1e40af !important;
+    border: 1px solid #bfdbfe !important;
+}
+.dark .bg-primary {
+    background-color: rgba(30, 64, 175, 0.2) !important;
+    color: #60a5fa !important;
+    border: 1px solid rgba(96, 165, 250, 0.3) !important;
+}
+
+.bg-secondary {
+    background-color: #f1f5f9 !important;
+    color: #334155 !important;
+    border: 1px solid #e2e8f0 !important;
+}
+.dark .bg-secondary {
+    background-color: #1e293b !important;
+    color: #94a3b8 !important;
+    border: 1px solid #334155 !important;
+}
+
+.bg-info {
+    background-color: #ecfeff !important;
+    color: #075985 !important;
+    border: 1px solid #cffafe !important;
+}
+.dark .bg-info {
+    background-color: rgba(7, 89, 133, 0.2) !important;
+    color: #22d3ee !important;
+    border: 1px solid rgba(34, 211, 238, 0.3) !important;
+}
+
+/* Flat & Modern Cards */
+.card {
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius) !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
+    overflow: hidden;
+}
+
+.card-header {
+    background-color: var(--bg-card) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    padding: 0.45rem 0.65rem !important;
+    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+    color: var(--text-primary) !important;
+}
+
+.card-body {
+    padding: 0.65rem !important;
+    color: var(--text-primary) !important;
+}
+
+.card-footer {
+    background-color: var(--bg-card) !important;
+    border-top: 1px solid var(--border-color) !important;
+    padding: 0.45rem 0.65rem !important;
+    color: var(--text-primary) !important;
+}
+
+/* Shadcn Compact Inputs & Selects */
+.form-control, .form-select {
+    font-size: 0.775rem !important;
+    padding: 0.2rem 0.5rem !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: calc(var(--radius) - 0.125rem) !important;
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02) !important;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--text-primary) !important;
+    box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1) !important;
+    outline: none !important;
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+.form-label {
+    font-size: 0.725rem !important;
+    font-weight: 500 !important;
+    color: var(--text-muted) !important;
+    margin-bottom: 0.125rem !important;
+}
+
+/* Compact Buttons */
+.btn {
+    font-size: 0.775rem !important;
+    padding: 0.2rem 0.6rem !important;
+    font-weight: 500 !important;
+    border-radius: calc(var(--radius) - 0.125rem) !important;
+    transition: all 0.15s ease-in-out !important;
+}
+
+.btn-primary {
+    background-color: var(--text-primary) !important;
+    border-color: var(--text-primary) !important;
+    color: var(--bg-page) !important;
+}
+
+.btn-primary:hover, .btn-primary:focus {
+    opacity: 0.9 !important;
+}
+
+.btn-outline-secondary {
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+    background-color: var(--bg-card) !important;
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--table-tr-hover) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Select2 Custom Styling to Match Shadcn Dark Mode */
+.select2-container--bootstrap-5 .select2-selection {
+    font-size: 0.8125rem !important;
+    min-height: 29px !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: calc(var(--radius) - 0.125rem) !important;
+    background-color: var(--bg-card) !important;
+}
+
+.select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+    line-height: 31px !important;
+    padding-left: 0.75rem !important;
+    color: var(--text-primary) !important;
+}
+
+.select2-dropdown {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.select2-container--bootstrap-5 .select2-dropdown .select2-results__option {
+    color: var(--text-primary) !important;
+}
+
+.select2-container--bootstrap-5 .select2-dropdown .select2-results__option--highlighted {
+    background-color: var(--table-tr-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Custom layout fixes for dark mode */
+.dark .text-gray-800, .dark .text-slate-800 {
+    color: #f8fafc !important;
+}
+.dark .text-slate-500, .dark .text-slate-600 {
+    color: #94a3b8 !important;
+}
+.dark .bg-white {
+    background-color: var(--bg-card) !important;
+}
+.dark .border-slate-200 {
+    border-color: var(--border-color) !important;
+}
+.dark .dropdown-menu {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+.dark .dropdown-item {
+    color: var(--text-primary) !important;
+}
+.dark .dropdown-item:hover {
+    background-color: var(--table-tr-hover) !important;
+}
+.dark .dropdown-item.active {
+    background-color: var(--text-primary) !important;
+    color: var(--bg-page) !important;
+}
+.dark footer {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+}
+.dark header {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+}
+
+
+/* Select2 Custom Styling to Match Shadcn */
+.select2-container--bootstrap-5 .select2-selection {
+    font-size: 0.8125rem !important;
+    min-height: 29px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: calc(var(--radius) - 0.125rem) !important;
+}
+
+.select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+    width: 100% !important;
+    margin: 0 !important;
+    line-height: 1.5 !important;
+    padding-left: 0.75rem !important;
+}
+
+/* Vertically center default and selected values in all single Select2 fields. */
+.select2-container--bootstrap-5 .select2-selection--single {
+    display: flex !important;
+    align-items: center !important;
+    min-height: 29px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+/* Global compact density for Bootstrap overlays and navigation controls. */
+.modal-header,
+.modal-footer {
+    padding: 0.5rem 0.75rem !important;
+}
+
+.modal-body {
+    padding: 0.75rem !important;
+}
+
+.modal-title {
+    font-size: 0.9rem !important;
+}
+
+.dropdown-menu {
+    padding: 0.25rem !important;
+    font-size: 0.775rem !important;
+}
+
+.dropdown-item {
+    padding: 0.3rem 0.55rem !important;
+}
+
+.pagination {
+    margin-bottom: 0 !important;
+    gap: 0.125rem;
+}
+
+.page-link {
+    min-width: 28px;
+    padding: 0.2rem 0.45rem !important;
+    font-size: 0.75rem !important;
+    text-align: center;
+}
+
+.alert {
+    padding: 0.45rem 0.65rem !important;
+    margin-bottom: 0.65rem !important;
+    font-size: 0.775rem !important;
+}
+
+.input-group-text {
+    padding: 0.2rem 0.5rem !important;
+    font-size: 0.775rem !important;
+}
+
+/* Keep record-count values visible beside pagination's "Show" label. */
+select#per_page.form-select {
+    width: 76px !important;
+    min-width: 76px !important;
+    padding-left: 0.5rem !important;
+    padding-right: 1.75rem !important;
+}
+
+/* Uniform select-all controls used only inside table headers. */
+th .table-header-checkbox {
+    width: 1.4rem !important;
+    height: 1.4rem !important;
+    margin: 0 !important;
+    vertical-align: middle !important;
+    cursor: pointer;
+}
+
+/* Row checkbox size used where table data must match the select-all control. */
+td .table-data-checkbox {
+    width: 1.15rem !important;
+    height: 1.15rem !important;
+    margin: 0 !important;
+    vertical-align: middle !important;
+    cursor: pointer;
+}
+
+@media (max-width: 767.98px) {
+    body {
+        font-size: 0.8125rem !important;
+    }
+
+    .btn,
+    .form-control,
+    .form-select {
+        min-height: 32px;
+    }
+}

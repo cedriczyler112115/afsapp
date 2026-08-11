@@ -68,7 +68,8 @@
                             <td class="text-nowrap">
                                 <a class="btn btn-sm btn-outline-primary" href="{{ route('groups.show', $g) }}"><i class="bi bi-eye"></i></a>
                                 <a class="btn btn-sm btn-outline-secondary" href="{{ route('groups.edit', $g) }}"><i class="bi bi-pencil"></i></a>
-                                <form action="{{ route('groups.destroy', $g) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this group?');">
+                                <form action="{{ route('groups.destroy', $g) }}" method="POST" class="d-inline"
+                                    data-confirm-title="Delete Group" data-confirm-message="Delete this group?" data-confirm-text="Delete">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>

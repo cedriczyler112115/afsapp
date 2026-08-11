@@ -142,6 +142,8 @@
         $(document).on('click', '.delete-type', function() {
             let id = $(this).data('id');
             $.confirm({
+                draggable: true,
+                dragWindowBorder: false,
                 title: 'Confirm',
                 content: 'Delete this document type?',
                 buttons: {
@@ -165,4 +167,3 @@
     });
 </script>
 @endpush
-

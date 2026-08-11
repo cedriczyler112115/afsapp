@@ -109,11 +109,36 @@
             float: right;
             text-align: right; /* Align content to right, but text inside generic left/center? */
         }
+        .sig-header {
+            margin-bottom: 40px;
+        }
+        .sig-name {
+            font-weight: 700;
+            text-transform: uppercase;
+            text-align: left;
+            min-height: 28px;
+        }
+        .sig-input {
+            width: 100%;
+            border: 0;
+            outline: 0;
+            background: transparent;
+            font: inherit;
+            color: #6c757d;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: 0;
+        }
         .sig-line {
             border-top: 1px solid #ddd;
-            margin-top: 40px;
+            margin-top: 6px;
             width: 100%;
             display: inline-block;
+        }
+        .sig-caption {
+            text-align: left;
+            margin-top: 2px;
+            font-size: 10pt;
         }
         
         /* Footer */
@@ -259,23 +284,17 @@
         <!-- Signatures -->
         <div class="signatures clearfix">
             <div class="sig-block">
-                <p>Issued & Certified by:</p>
-                <br><br><br>
-                <div class="text-center">
-                    <span class="fw-bold text-uppercase" style="margin-bottom: 10px;">{{ Auth::user()->name }}</span>
-                    <div class="sig-line" style="margin-top: -10px"></div>
-                    <small>Authorized Personnel</small>
-                </div>
+                <div class="sig-header">Issued & Certified by:</div>
+                <div class="sig-name">{{ Auth::user()->name }}</div>
+                <div class="sig-line"></div>
+                <div class="sig-caption">Authorized Personnel</div>
             </div>
 
             <div class="sig-block right">
-                <p style="text-align: left;">Received & Conformed by:</p>
-                <br><br><br>
-                <div class="text-center">
-                    <span class="fw-bold text-uppercase" style="margin-bottom: 10px;"><input type="text" id="received_conformed_by" name="received_conformed_by" value="{{ $group->received_conformed_by }}" class="no-border" style="text-align: center;width: 400px;border:0;font-weight: bold;" placeholder="Write the accountable person"></span>
-                    <div class="sig-line" style="margin-top: -10px"></div>
-                    <small>Recipient Signature over Printed Name</small>
-                </div>
+                <div class="sig-header" style="text-align: left;">Received & Conformed by:</div>
+                <input type="text" id="received_conformed_by" name="received_conformed_by" class="sig-input" value="{{ $group->received_conformed_by }}" placeholder="Write the accountable person" aria-label="Write the accountable person">
+                <div class="sig-line"></div>
+                <div class="sig-caption">Recipient Signature over Printed Name</div>
             </div>
         </div>
 

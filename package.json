@@ -4,7 +4,10 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "tauri": "npm --prefix ./tauri-app run tauri",
+        "tauri:dev": "npm --prefix ./tauri-app run dev",
+        "tauri:build": "npm --prefix ./tauri-app run tauri:build"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

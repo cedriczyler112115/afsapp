@@ -11,7 +11,7 @@ return [
     'transaction_type' => 'Transaction type',
     'document_type' => 'Document type',
     'assigned_personnel' => 'Assigned personnel',
-    'assigned_personnel_limited' => 'Personnel filter is available to administrators.',
+    'assigned_personnel_limited' => 'Admin only',
     'status' => 'Status',
     'all' => 'All',
     'incoming' => 'Incoming',

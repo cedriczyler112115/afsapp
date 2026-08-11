@@ -173,7 +173,7 @@
                 <thead class="table-light">
                     <tr>
                         <th style="width: 40px;" class="text-center">
-                            <input type="checkbox" id="selectAll" class="form-check-input">
+                            <input type="checkbox" id="selectAll" class="form-check-input table-header-checkbox">
                         </th>
                         <th>Serial</th>
                         <th>Full Code</th>
@@ -187,7 +187,7 @@
                     @forelse($stockTransactions as $transaction)
                     <tr>
                         <td class="text-center">
-                            <input type="checkbox" class="form-check-input unit-checkbox" value="{{ $transaction->unit_id }}" data-fullcode="{{ $transaction->full_code }}" data-itemname="{{ $item->item_name }}">
+                            <input type="checkbox" class="form-check-input unit-checkbox table-data-checkbox" value="{{ $transaction->unit_id }}" data-fullcode="{{ $transaction->full_code }}" data-itemname="{{ $item->item_name }}">
                         </td>
                         <td>{{ $transaction->serial ?? '-' }}</td>
                         <td>{{ $transaction->full_code ?? '-' }}</td>
@@ -201,13 +201,15 @@
                             @endif
                         </td>
                         <td>
-                             {{-- Since we are in "Edit Mode", we can provide a way to delete specific transactions --}}
-                             {{-- Note: Editing a specific transaction's serial/code is complex. For now, we provide delete. --}}
-                             <form action="{{ route('stock-in.transaction.destroy', $transaction->transaction_id) }}" method="POST" class="d-inline delete-form">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
-                            </form>
+                            @unless($transaction->is_printed)
+                                <form action="{{ route('stock-in.transaction.destroy', $transaction->transaction_id) }}" method="POST" class="d-inline delete-form">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-sm btn-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            @endunless
                         </td>
                         
                     </tr>
@@ -408,6 +410,8 @@
             e.preventDefault();
             var form = this;
             $.confirm({
+                draggable: true,
+                dragWindowBorder: false,
                 title: 'Confirm Delete',
                 content: 'Delete this specific unit entry?',
                 type: 'red',

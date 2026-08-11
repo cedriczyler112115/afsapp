@@ -23,7 +23,10 @@
                 <td class="text-nowrap">
                     <a href="{{ route('stock-in.edit', $transaction->item_id) }}" class="btn btn-sm btn-primary" title="Edit"><i class="bi bi-pencil-square"></i></a>
                     @if($transaction->current_quantity == 0)
-                    <form action="{{ route('stock-in.destroy', $transaction->item_id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete all stock-in history for this item? This action cannot be undone.');">
+                    <form action="{{ route('stock-in.destroy', $transaction->item_id) }}" method="POST" class="d-inline"
+                        data-confirm-title="Delete Stock-in History"
+                        data-confirm-message="Are you sure you want to delete all stock-in history for this item? This action cannot be undone."
+                        data-confirm-text="Delete">
                         @csrf
                         @method('DELETE')
                         {{-- <button type="submit" class="btn btn-sm btn-danger" title="Delete"><i class="bi bi-trash"></i></button> --}}

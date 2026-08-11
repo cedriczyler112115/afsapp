@@ -3,6 +3,14 @@
 @section('title', '4Ps AFS-IS - Damaged & Unserviceable')
 
 @section('content')
+<style>
+    .damaged-items-checkbox {
+        width: 1.1rem;
+        height: 1.1rem;
+        vertical-align: middle;
+        cursor: pointer;
+    }
+</style>
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center bg-danger text-white">
         <span>Damaged & Unserviceable</span>

@@ -38,7 +38,8 @@
         </div>
 
         <div class="mt-4 d-flex justify-content-end">
-            <form action="{{ route('groups.destroy', $group) }}" method="POST" onsubmit="return confirm('Delete this group?');">
+            <form action="{{ route('groups.destroy', $group) }}" method="POST"
+                data-confirm-title="Delete Group" data-confirm-message="Delete this group?" data-confirm-text="Delete">
                 @csrf
                 @method('DELETE')
                 <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete</button>
@@ -47,4 +48,3 @@
     </div>
 </div>
 @endsection
-

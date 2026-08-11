@@ -94,7 +94,7 @@
                 <thead class="table-light">
                     <tr>
                         <th style="width: 44px;" class="text-center">
-                            <input type="checkbox" id="select_all" class="form-check-input" style="width: 1.35rem; height: 1.35rem;">
+                            <input type="checkbox" id="select_all" class="form-check-input table-header-checkbox">
                         </th>
                         <th style="width: 170px;"><a href="{{ $sortUrl('document_number') }}" class="text-decoration-none">Document Number</a></th>
                         <th style="width: 220px;"><a href="{{ $sortUrl('drn') }}" class="text-decoration-none">DRN/FETS/ICS/DV/PAR&nbsp;NO.</a></th>

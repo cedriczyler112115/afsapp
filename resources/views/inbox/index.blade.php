@@ -190,6 +190,8 @@
             if ($btn.data('loading') === 1) return;
 
             $.confirm({
+                draggable: true,
+                dragWindowBorder: false,
                 title: 'Confirm Action',
                 content: 'Are you sure you want to mark this document as received?',
                 buttons: {

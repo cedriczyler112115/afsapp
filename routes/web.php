@@ -11,6 +11,7 @@ use App\Http\Controllers\IncomingDocumentController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\LowStockController;
+use App\Http\Controllers\MonthlyTransactionController;
 use App\Http\Controllers\StockInController;
 use App\Http\Controllers\StockOutController;
 use App\Http\Controllers\StockReturnController;
@@ -30,6 +31,28 @@ Route::middleware(['guest'])->group(function () {
     Route::post('/register', [LoginController::class, 'register'])->name('register.post');
     Route::post('/register/check-email', [LoginController::class, 'checkEmail'])->name('register.check-email');
 
+    Route::post('/api/desktop/login', [LoginController::class, 'desktopLogin'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/api/desktop/me', [LoginController::class, 'desktopMe']);
+    Route::get('/api/desktop/check-google-auth', [\App\Http\Controllers\OAuthController::class, 'checkGoogleAuth']);
+    Route::get('/api/desktop/inbox', [IncomingDocumentController::class, 'desktopInbox']);
+    Route::post('/api/desktop/inbox/{recipient}/receive', [IncomingDocumentController::class, 'desktopReceive'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/api/desktop/tracking', [IncomingDocumentController::class, 'desktopTracking']);
+    Route::get('/api/desktop/documents/create/lookups', [IncomingDocumentController::class, 'desktopCreateLookups']);
+    Route::post('/api/desktop/documents', [IncomingDocumentController::class, 'desktopStore'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    Route::put('/api/desktop/documents/{incomingDocument}', [IncomingDocumentController::class, 'desktopUpdateDocument'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    Route::delete('/api/desktop/documents/{incomingDocument}', [IncomingDocumentController::class, 'desktopDeleteDocument'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/api/desktop/documents/{incomingDocument}/logs', [IncomingDocumentController::class, 'desktopLogs'])->withTrashed();
+    Route::post('/api/desktop/documents/{incomingDocument}/add-update', [IncomingDocumentController::class, 'desktopAddUpdateLog'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    Route::put('/api/desktop/documents/{incomingDocument}/logs/{documentLog}', [IncomingDocumentController::class, 'desktopUpdateLog'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/api/desktop/documents/{incomingDocument}/forward', [IncomingDocumentController::class, 'desktopForward'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/api/desktop/lookups/sources', [IncomingDocumentController::class, 'desktopLookupSources']);
+    Route::post('/api/desktop/lookups/sources', [IncomingDocumentController::class, 'desktopCreateSource'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    Route::post('/api/desktop/lookups/types', [IncomingDocumentController::class, 'desktopCreateType'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+    Route::get('/api/desktop/lookups/groups', [IncomingDocumentController::class, 'groupOptions']);
+    Route::get('/api/desktop/lookups/active-users', [IncomingDocumentController::class, 'inboxActiveUsers']);
+    Route::get('/api/desktop/update', [IncomingDocumentController::class, 'desktopUpdate']);
+    Route::get('/sse/document-notifications', [\App\Http\Controllers\SseNotificationController::class, 'streamNotifications']);
+
     Route::get('/auth/google', [\App\Http\Controllers\OAuthController::class, 'redirectToGoogle'])->name('auth.google');
     Route::get('/auth/google/callback', [\App\Http\Controllers\OAuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 
@@ -43,16 +66,6 @@ Route::middleware(['guest'])->group(function () {
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 Route::middleware(['auth', \App\Http\Middleware\EnsureProfileIsComplete::class])->group(function () {
-    Route::get('/locale/{locale}', function (string $locale) {
-        if (! in_array($locale, ['en', 'fil'], true)) {
-            $locale = config('app.fallback_locale', 'en');
-        }
-
-        session(['app_locale' => $locale]);
-
-        return redirect()->back();
-    })->name('locale.set');
-
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/items-by-category', [DashboardController::class, 'getItemsByCategory'])->name('dashboard.items-by-category');
     Route::get('/dashboard/tracking-dashboard', [TrackingDashboardController::class, 'index'])->name('tracking-dashboard.index');
@@ -61,6 +74,8 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureProfileIsComplete::class])
     Route::get('/dashboard/tracking-dashboard/export/csv', [TrackingDashboardController::class, 'exportCsv'])->name('tracking-dashboard.export.csv');
     Route::get('/dashboard/tracking-dashboard/export/pdf', [TrackingDashboardController::class, 'exportPdf'])->name('tracking-dashboard.export.pdf');
     Route::get('low-stock', [LowStockController::class, 'index'])->name('low-stock.index');
+    Route::get('monthly-transactions', [MonthlyTransactionController::class, 'index'])->name('monthly-transactions.index');
+    Route::get('monthly-transactions/print', [MonthlyTransactionController::class, 'print'])->name('monthly-transactions.print');
 
     Route::resource('categories', CategoryController::class);
     Route::resource('unit_of_measures', UnitOfMeasureController::class);

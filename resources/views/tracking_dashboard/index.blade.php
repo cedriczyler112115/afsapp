@@ -73,16 +73,19 @@
                 </div>
 
                 <div class="col-12 col-md-4 col-lg-3">
-                    <label for="personnel_id" class="form-label small mb-1">{{ __('tracking_dashboard.assigned_personnel') }}</label>
+                    <label for="personnel_id" class="form-label small mb-1">{{ __('tracking_dashboard.assigned_personnel') }} 
+                        @if(count($users) === 0)
+                        (<i>{{ __('tracking_dashboard.assigned_personnel_limited') }}</i>)
+                    @endif
+
+                    </label>
                     <select id="personnel_id" name="personnel_id" class="form-select form-select-sm" @if(count($users) === 0) disabled @endif>
                         <option value="">{{ __('tracking_dashboard.all') }}</option>
                         @foreach($users as $u)
                             <option value="{{ $u->id }}">{{ $u->name }}</option>
                         @endforeach
                     </select>
-                    @if(count($users) === 0)
-                        <div class="form-text">{{ __('tracking_dashboard.assigned_personnel_limited') }}</div>
-                    @endif
+
                 </div>
 
                 <div class="col-6 col-md-2 col-lg-2">

@@ -213,7 +213,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th class="text-center" style="width: 50px;">
-                                    <input type="checkbox" id="selectAllModal" class="modal-checkbox">
+                                    <input type="checkbox" id="selectAllModal" class="modal-checkbox table-header-checkbox">
                                 </th>
                                 <th>Serial</th>
                                 <th>Full Code</th>
@@ -617,6 +617,8 @@
             let form = this;
 
             $.confirm({
+                draggable: true,
+                dragWindowBorder: false,
                 title: 'Confirm Damage Report',
                 content: 'Are you sure you want to report these items as damaged? This action cannot be undone easily.',
                 type: 'red',

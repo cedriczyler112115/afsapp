@@ -1824,6 +1824,7 @@ class IncomingDocumentController extends Controller
                 'date_signed' => $validated['date_signed'] ?? null,
                 'priority_level' => $validated['priority_level'] ?? null,
                 'deadline_date' => $validated['deadline_date'] ?? null,
+                'received_remarks' => $validated['received_remarks'] ?? null,
                 'is_archived' => (bool) ($validated['is_archived'] ?? false),
             ];
 
@@ -1912,6 +1913,11 @@ class IncomingDocumentController extends Controller
     public function forward(Request $request, IncomingDocument $incomingDocument)
     {
         $this->assertDocumentOwner($incomingDocument);
+        if (! $this->hasUserReceivedDocument($incomingDocument, (int) Auth::id())) {
+            throw ValidationException::withMessages([
+                'forward_to' => ['Receive the document before forwarding it.'],
+            ]);
+        }
 
         $request->validate([
             'forward_to' => ['required', 'in:user,group'],
@@ -2010,6 +2016,30 @@ class IncomingDocumentController extends Controller
             if (! empty($toInsert)) {
                 DB::table('incoming_document_forward_recipients')->insert($toInsert);
                 $addedIds = array_map(fn ($row) => (int) $row['user_id'], $toInsert);
+
+                // Fetch the newly created recipient record IDs (id) from the table
+                $recipients = DB::table('incoming_document_forward_recipients')
+                    ->where('incoming_document_id', $incomingDocument->id)
+                    ->whereIn('user_id', $addedIds)
+                    ->get(['id', 'user_id']);
+
+                foreach ($recipients as $recipient) {
+                    $recipientRecordId = (int) $recipient->id;
+                    $recipientUserId = (int) $recipient->user_id;
+
+                    event(new \App\Events\DocumentRouted($recipientUserId, [
+                        'recipient_id' => $recipientRecordId,
+                        'document_id' => $incomingDocument->id,
+                        'tracking_number' => $incomingDocument->document_reference_number,
+                        'drn' => $incomingDocument->drn,
+                        'subject' => $incomingDocument->subject,
+                        'document_type' => $incomingDocument->type->name ?? 'Standard',
+                        'origin_office' => $incomingDocument->source->name ?? 'N/A',
+                        'sender' => Auth::user()->name ?? 'System',
+                        'date_routed' => now()->toDateTimeString(),
+                        'remarks' => $request->input('forward_remarks') ?: 'None'
+                    ]));
+                }
             }
 
             if (! empty($duplicates)) {
@@ -2308,7 +2338,9 @@ class IncomingDocumentController extends Controller
             'is_archived' => ['nullable', 'boolean'],
             'received_remarks' => ['nullable', 'string'],
             'update_remarks' => ['nullable', 'string'],
-            'attachment' => ['nullable', 'file', 'max:5120'],
+            'attachment' => ['nullable', 'file', 'max:20480'],
+            'attachments' => ['nullable', 'array'],
+            'attachments.*' => ['nullable', 'file', 'max:20480'],
         ];
 
         $validated = $request->validate($rules);
@@ -2330,7 +2362,7 @@ class IncomingDocumentController extends Controller
         return [
             'RECEIVED',
             'FORWARDED',
-            'ARCHIVED',
+            'DELETED',
         ];
     }
 
@@ -2453,5 +2485,1160 @@ class IncomingDocumentController extends Controller
         if (! $isAllowed) {
             abort(403);
         }
+    }
+
+    private function hasUserReceivedDocument(IncomingDocument $incomingDocument, int $userId): bool
+    {
+        if (
+            $userId > 0
+            && Schema::hasTable('incoming_document_forward_recipients')
+            && Schema::hasColumn('incoming_document_forward_recipients', 'date_received')
+        ) {
+            $recipient = DB::table('incoming_document_forward_recipients')
+                ->where('incoming_document_id', $incomingDocument->id)
+                ->where('user_id', $userId)
+                ->orderByDesc('id')
+                ->first(['date_received']);
+
+            if ($recipient) {
+                return $recipient->date_received !== null;
+            }
+        }
+
+        return $incomingDocument->date_received !== null;
+    }
+
+    /**
+     * Desktop API endpoint for Inbox documents list with search, status & type filters, and pagination.
+     */
+    public function desktopInbox(Request $request)
+    {
+        $userId = (int) Auth::id();
+        if (! $userId) {
+            // Fallback for desktop API if auth ID is passed in query
+            $userId = (int) $request->input('user_id', 0);
+        }
+
+        $search = trim((string) $request->input('search', ''));
+        $status = trim((string) $request->input('status', 'all')); // 'all', 'pending', 'received'
+        $typeId = $request->filled('document_type_id') ? (int) $request->input('document_type_id') : null;
+        $sort = trim((string) $request->input('sort', 'date_forwarded'));
+        $dir = strtolower(trim((string) $request->input('dir', 'desc'))) === 'asc' ? 'asc' : 'desc';
+        $perPage = min(max((int) $request->input('per_page', 20), 5), 100);
+
+        $usersTableAvailable = Schema::hasTable('users') && Schema::hasColumn('users', 'name');
+
+        $sortMap = [
+            'document_number' => 'incoming_documents.document_reference_number',
+            'drn' => 'incoming_documents.drn',
+            'type' => 'document_types.name',
+            'transaction_type' => 'incoming_documents.transaction_type',
+            'title' => 'incoming_documents.subject',
+            'origin_office' => 'document_sources.name',
+            'date_forwarded' => 'incoming_documents.date_forwarded',
+            'date_received' => 'incoming_document_forward_recipients.date_received',
+        ];
+        $sortColumn = $sortMap[$sort] ?? $sortMap['date_forwarded'];
+
+        $baseQuery = DB::table('incoming_documents')
+            ->leftJoin('incoming_document_forward_recipients', 'incoming_documents.id', '=', 'incoming_document_forward_recipients.incoming_document_id')
+            ->leftJoin('document_sources', 'incoming_documents.document_source_id', '=', 'document_sources.id')
+            ->leftJoin('document_types', 'incoming_documents.document_type_id', '=', 'document_types.id')
+            ->when($usersTableAvailable, function ($q) {
+                $q->leftJoin('users as behalf_users', 'incoming_document_forward_recipients.received_in_behalf', '=', 'behalf_users.id');
+            });
+
+        if ($userId > 0) {
+            $baseQuery->where('incoming_document_forward_recipients.user_id', $userId);
+        }
+
+        // Apply Status Filter
+        if ($status === 'pending') {
+            $baseQuery->whereNull('incoming_document_forward_recipients.date_received');
+        } elseif ($status === 'received') {
+            $baseQuery->whereNotNull('incoming_document_forward_recipients.date_received');
+        }
+
+        // Apply Document Type Filter
+        if ($typeId) {
+            $baseQuery->where('incoming_documents.document_type_id', $typeId);
+        }
+
+        // Apply Search Filter
+        if ($search !== '') {
+            $baseQuery->where(function ($q) use ($search) {
+                $q->where('incoming_documents.document_reference_number', 'like', "%{$search}%")
+                    ->orWhere('incoming_documents.drn', 'like', "%{$search}%")
+                    ->orWhere('incoming_documents.subject', 'like', "%{$search}%")
+                    ->orWhere('document_sources.name', 'like', "%{$search}%");
+            });
+        }
+
+        $select = [
+            'incoming_document_forward_recipients.id as recipient_id',
+            'incoming_documents.id as document_id',
+            'incoming_documents.document_reference_number as document_number',
+            'incoming_documents.drn as drn',
+            'document_types.name as type',
+            'incoming_documents.document_type_id as document_type_id',
+            Schema::hasColumn('incoming_documents', 'transaction_type')
+                ? 'incoming_documents.transaction_type as transaction_type'
+                : DB::raw('NULL as transaction_type'),
+            'incoming_documents.subject as title',
+            'document_sources.name as origin_office',
+            'incoming_documents.date_forwarded as date_forwarded',
+            'incoming_document_forward_recipients.date_received as date_received',
+            'incoming_document_forward_recipients.received_in_behalf as received_in_behalf',
+            'incoming_documents.forward_remarks as remarks',
+            'incoming_documents.priority_level as priority',
+            'incoming_documents.attachment_path as attachment_path',
+            'incoming_documents.document_from_type as document_from_type',
+            'incoming_documents.date_received as date_received_origin',
+            'incoming_documents.description as description',
+            'incoming_documents.signed_by as signed_by',
+            'incoming_documents.date_signed as date_signed',
+            'incoming_documents.deadline_date as deadline_date',
+            'incoming_documents.received_remarks as received_remarks',
+        ];
+        if ($usersTableAvailable) {
+            $select[] = 'behalf_users.name as received_in_behalf_name';
+        }
+
+        $paginator = (clone $baseQuery)
+            ->select($select)
+            ->orderBy($sortColumn, $dir)
+            ->orderByDesc('incoming_documents.id')
+            ->paginate($perPage);
+
+        $documentTypes = DB::table('document_types')
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $paginator->items(),
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+            ],
+            'document_types' => $documentTypes,
+        ]);
+    }
+
+    /**
+     * Desktop API endpoint to mark an inbox recipient document as received.
+     */
+    public function desktopReceive(Request $request, $recipientId)
+    {
+        $recipientId = (int) $recipientId;
+        $userId = Auth::id() ?: (int) $request->input('user_id', 0);
+
+        $recipient = DB::table('incoming_document_forward_recipients')
+            ->where('id', $recipientId)
+            ->first();
+
+        if (! $recipient) {
+            return response()->json(['success' => false, 'message' => 'Recipient record not found.'], 440);
+        }
+
+        DB::table('incoming_document_forward_recipients')
+            ->where('id', $recipientId)
+            ->update([
+                'date_received' => now(),
+                'received_by' => $userId ?: $recipient->user_id,
+            ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Document marked as received successfully.',
+        ]);
+    }
+
+    /**
+     * Desktop API endpoint for Tracking document timeline & status.
+     */
+    public function desktopTracking(Request $request)
+    {
+        $search = trim((string) $request->input('search', ''));
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+        $creatorId = $request->filled('created_by') ? (int) $request->input('created_by') : null;
+        $status = strtoupper(trim((string) $request->input('status', '')));
+        $transactionType = $request->filled('transaction_type') ? (int) $request->input('transaction_type') : null;
+        $perPage = in_array((int) $request->input('per_page', 20), [10, 20, 25, 50], true)
+            ? (int) $request->input('per_page', 20)
+            : 20;
+        $userId = (int) $request->input('user_id', 0);
+        $userGroupId = $userId > 0 ? (int) (User::whereKey($userId)->value('group_id') ?? 0) : 0;
+
+        $showDeleted = ($status === 'DELETED');
+
+        $documentsQuery = IncomingDocument::query()
+            ->when($showDeleted, fn ($q) => $q->onlyTrashed())
+            ->with(['source', 'type'])
+            ->when(Schema::hasColumn('incoming_documents', 'created_by'), function ($query) use ($creatorId) {
+                $query->with('createdByUser');
+                if ($creatorId) {
+                    $query->where('created_by', $creatorId);
+                }
+            })
+            ->when(Schema::hasTable('incoming_document_forward_recipients'), function ($query) {
+                $query->with(['forwardedRecipients.user:id,name,email']);
+            })
+            ->when(
+                Schema::hasTable('incoming_document_forward_recipients')
+                    && Schema::hasColumn('incoming_document_forward_recipients', 'date_received'),
+                function ($query) {
+                    $query->withCount([
+                        'forwardedRecipients as total_recipients_count',
+                        'forwardedRecipients as received_recipients_count' => fn ($q) => $q->whereNotNull('date_received'),
+                    ]);
+                }
+            )
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('document_reference_number', 'like', "%{$search}%")
+                        ->orWhere('drn', 'like', "%{$search}%")
+                        ->orWhere('subject', 'like', "%{$search}%");
+                });
+            })
+            ->when($dateFrom, fn ($q) => $q->whereDate('date_received', '>=', $dateFrom))
+            ->when($dateTo, fn ($q) => $q->whereDate('date_received', '<=', $dateTo))
+            ->when(in_array($status, $this->statuses(), true) && $status !== 'DELETED', fn ($q) => $q->where('current_status', $status))
+            ->when(
+                in_array($transactionType, [1, 2], true)
+                    && Schema::hasColumn('incoming_documents', 'transaction_type'),
+                fn ($q) => $q->where('transaction_type', $transactionType)
+            )
+            ->orderByDesc('id');
+
+        $paginator = $documentsQuery->paginate($perPage);
+        $documents = collect($paginator->items())->map(function (IncomingDocument $doc) use ($userId, $userGroupId) {
+            $recipients = collect($doc->forwardedRecipients ?? [])->map(fn ($recipient) => [
+                'recipient_id' => (int) $recipient->id,
+                'user_id' => (int) $recipient->user_id,
+                'user_name' => $recipient->user?->name,
+                'user_email' => $recipient->user?->email,
+                'date_received' => $recipient->date_received,
+                'received_by' => $recipient->received_by ?? null,
+                'created_at' => $recipient->created_at,
+            ])->values();
+            $totalRecipients = (int) ($doc->total_recipients_count ?? $recipients->count());
+            $receivedRecipients = (int) ($doc->received_recipients_count ?? $recipients->whereNotNull('date_received')->count());
+            $canEdit = $userId > 0
+                && Schema::hasColumn('incoming_documents', 'created_by')
+                && (int) $doc->created_by === $userId;
+            $currentRecipient = $recipients
+                ->where('user_id', $userId)
+                ->sortByDesc('recipient_id')
+                ->first();
+            $canForward = $userId > 0 && (
+                (int) $doc->received_by === $userId
+                || (int) $doc->forwarded_to_user_id === $userId
+                || (Schema::hasColumn('incoming_documents', 'created_by') && (int) $doc->created_by === $userId)
+                || (
+                    Schema::hasColumn('incoming_documents', 'forwarded_to_group_id')
+                    && (int) $doc->forwarded_to_group_id > 0
+                    && (int) $doc->forwarded_to_group_id === $userGroupId
+                )
+                || $currentRecipient !== null
+            );
+            $canForward = $canForward && ($currentRecipient
+                ? $currentRecipient['date_received'] !== null
+                : $doc->date_received !== null);
+
+            return [
+                'id' => (int) $doc->id,
+                'document_id' => (int) $doc->id,
+                'transaction_type' => (int) ($doc->transaction_type ?? 0),
+                'transaction_type_label' => (int) ($doc->transaction_type ?? 0) === 2 ? 'OUTGOING' : 'INCOMING',
+                'created_by' => (int) ($doc->created_by ?? 0),
+                'created_by_name' => $doc->createdByUser?->name,
+                'can_edit' => $canEdit,
+                'can_forward' => $canForward,
+                'document_reference_number' => $doc->document_reference_number,
+                'document_number' => $doc->document_reference_number,
+                'date_received' => optional($doc->date_received)->toISOString(),
+                'drn' => $doc->drn,
+                'document_from_type' => $doc->document_from_type,
+                'document_source_id' => (int) $doc->document_source_id,
+                'source_name' => $doc->source?->name,
+                'origin_office' => $doc->source?->name,
+                'type_name' => $doc->type?->name,
+                'document_type_id' => (int) $doc->document_type_id,
+                'type' => $doc->type?->name,
+                'subject' => $doc->subject,
+                'title' => $doc->subject,
+                'description' => $doc->description,
+                'current_status' => $doc->current_status,
+                'signed_by' => $doc->signed_by,
+                'date_signed' => optional($doc->date_signed)->toDateString(),
+                'date_forwarded' => optional($doc->date_forwarded)->toISOString(),
+                'forward_remarks' => $doc->forward_remarks,
+                'remarks' => $doc->forward_remarks,
+                'received_remarks' => $doc->received_remarks,
+                'attachment_path' => $doc->attachment_path,
+                'priority' => $doc->priority_level,
+                'deadline_date' => optional($doc->deadline_date)->toDateString(),
+                'total_recipients' => $totalRecipients,
+                'received_recipients' => $receivedRecipients,
+                'recipients' => $recipients,
+                'deleted_at' => $doc->deleted_at ? $doc->deleted_at->toISOString() : null,
+            ];
+        })->values();
+
+        $creators = Schema::hasColumn('incoming_documents', 'created_by')
+            ? User::query()->orderBy('name')->get(['id', 'name'])
+            : collect();
+
+        return response()->json([
+            'success' => true,
+            'documents' => $documents,
+            'creators' => $creators,
+            'statuses' => $this->statuses(),
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'from' => $paginator->firstItem() ?? 0,
+                'to' => $paginator->lastItem() ?? 0,
+            ],
+        ]);
+    }
+
+    public function desktopCreateLookups()
+    {
+        return response()->json([
+            'success' => true,
+            'sources' => DocumentSource::query()
+                ->whereNull('deleted_at')
+                ->orderBy('source_type')
+                ->orderBy('name')
+                ->get(['id', 'source_type', 'name', 'is_active']),
+            'types' => DocumentType::query()
+                ->whereNull('deleted_at')
+                ->orderBy('name')
+                ->get(['id', 'name', 'is_active']),
+        ]);
+    }
+
+    public function desktopStore(Request $request)
+    {
+        $validated = $this->validateDocument($request);
+        $userId = (int) $request->input('user_id', 0);
+        $user = User::findOrFail($userId);
+
+        $document = DB::transaction(function () use ($request, $validated, $user) {
+            $attachmentPaths = [];
+            if ($request->hasFile('attachment')) {
+                $file = $request->file('attachment');
+                $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                $attachmentPaths[] = $file->storeAs('incoming_documents', $filename, 'public');
+            }
+            if ($request->hasFile('attachments')) {
+                foreach ($request->file('attachments') as $file) {
+                    $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                    $attachmentPaths[] = $file->storeAs('incoming_documents', $filename, 'public');
+                }
+            }
+            $attachmentPath = count($attachmentPaths) > 0
+                ? (count($attachmentPaths) === 1 ? $attachmentPaths[0] : json_encode($attachmentPaths))
+                : null;
+
+            $payload = [
+                'document_reference_number' => $validated['document_reference_number'],
+                'date_received' => $validated['date_received'],
+                'document_from_type' => $validated['document_from_type'],
+                'transaction_type' => $validated['transaction_type'],
+                'document_source_id' => $validated['document_source_id'],
+                'drn' => $validated['drn'] ?? null,
+                'document_type_id' => $validated['document_type_id'],
+                'subject' => $validated['subject'],
+                'description' => $validated['description'] ?? null,
+                'current_status' => 'RECEIVED',
+                'signed_by' => $validated['signed_by'] ?? null,
+                'date_signed' => $validated['date_signed'] ?? null,
+                'received_by' => $user->id,
+                'received_remarks' => $validated['received_remarks'] ?? null,
+                'attachment_path' => $attachmentPath,
+                'priority_level' => $validated['priority_level'] ?? null,
+                'deadline_date' => $validated['deadline_date'] ?? null,
+                'is_archived' => false,
+            ];
+            if (Schema::hasColumn('incoming_documents', 'created_by')) {
+                $payload['created_by'] = $user->id;
+            }
+
+            $document = IncomingDocument::create($payload);
+            DocumentLog::create([
+                'incoming_document_id' => $document->id,
+                'user_id' => $user->id,
+                'action_type' => 'CREATED',
+                'action_timestamp' => now(),
+                'status_from' => null,
+                'status_to' => 'RECEIVED',
+                'remarks' => $validated['received_remarks'] ?? null,
+            ]);
+
+            return $document;
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Incoming document created successfully.',
+            'document_id' => $document->id,
+        ], 201);
+    }
+
+    public function desktopUpdateDocument(Request $request, IncomingDocument $incomingDocument)
+    {
+        $userId = (int) $request->input('user_id', 0);
+        User::findOrFail($userId);
+        $isAllowed = Schema::hasColumn('incoming_documents', 'created_by')
+            && (int) ($incomingDocument->created_by ?? 0) === $userId;
+        if (! $isAllowed) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
+        $validated = $this->validateDocument($request, $incomingDocument->id);
+        DB::transaction(function () use ($request, $validated, $incomingDocument, $userId) {
+            $payload = [
+                'document_reference_number' => $validated['document_reference_number'],
+                'date_received' => $validated['date_received'],
+                'document_from_type' => $validated['document_from_type'],
+                'transaction_type' => $validated['transaction_type'],
+                'document_source_id' => $validated['document_source_id'],
+                'drn' => $validated['drn'] ?? null,
+                'document_type_id' => $validated['document_type_id'],
+                'subject' => $validated['subject'],
+                'description' => $validated['description'] ?? null,
+                'signed_by' => $validated['signed_by'] ?? null,
+                'date_signed' => $validated['date_signed'] ?? null,
+                'priority_level' => $validated['priority_level'] ?? null,
+                'deadline_date' => $validated['deadline_date'] ?? null,
+                'received_remarks' => $validated['received_remarks'] ?? null,
+                'is_archived' => (bool) ($validated['is_archived'] ?? false),
+            ];
+            if ($request->hasFile('attachment') || $request->hasFile('attachments')) {
+                if ($incomingDocument->attachment_path) {
+                    $oldPaths = json_decode($incomingDocument->attachment_path, true);
+                    if (is_array($oldPaths)) {
+                        foreach ($oldPaths as $oldPath) {
+                            Storage::disk('public')->delete($oldPath);
+                        }
+                    } else {
+                        Storage::disk('public')->delete($incomingDocument->attachment_path);
+                    }
+                }
+                $attachmentPaths = [];
+                if ($request->hasFile('attachment')) {
+                    $file = $request->file('attachment');
+                    $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                    $attachmentPaths[] = $file->storeAs('incoming_documents', $filename, 'public');
+                }
+                if ($request->hasFile('attachments')) {
+                    foreach ($request->file('attachments') as $file) {
+                        $filename = time() . '_' . uniqid() . '_' . $file->getClientOriginalName();
+                        $attachmentPaths[] = $file->storeAs('incoming_documents', $filename, 'public');
+                    }
+                }
+                $payload['attachment_path'] = count($attachmentPaths) === 1 ? $attachmentPaths[0] : json_encode($attachmentPaths);
+            }
+
+            $incomingDocument->fill($payload);
+            $changes = [];
+            foreach ($incomingDocument->getDirty() as $field => $newValue) {
+                $changes[] = [
+                    'field' => $field,
+                    'old' => $incomingDocument->getOriginal($field),
+                    'new' => $newValue,
+                ];
+            }
+            $incomingDocument->save();
+            DocumentLog::create([
+                'incoming_document_id' => $incomingDocument->id,
+                'user_id' => $userId,
+                'action_type' => 'UPDATED',
+                'action_timestamp' => now(),
+                'status_from' => null,
+                'status_to' => null,
+                'remarks' => json_encode($changes, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT),
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Incoming document updated successfully.',
+            'document_id' => $incomingDocument->id,
+        ]);
+    }
+
+    public function desktopDeleteDocument(Request $request, IncomingDocument $incomingDocument)
+    {
+        $userId = (int) $request->input('user_id', 0);
+        \App\Models\User::findOrFail($userId);
+        
+        $isAllowed = Schema::hasColumn('incoming_documents', 'created_by')
+            && (int) ($incomingDocument->created_by ?? 0) === $userId;
+            
+        if (! $isAllowed) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
+        $hasBeenReceived = DocumentLog::query()
+            ->where('incoming_document_id', $incomingDocument->id)
+            ->whereIn('action_type', ['INBOX_RECEIVED', 'RECEIVED'])
+            ->exists();
+
+        $hasBeenReceivedForward = false;
+        if (Schema::hasTable('incoming_document_forward_recipients') && Schema::hasColumn('incoming_document_forward_recipients', 'date_received')) {
+            $hasBeenReceivedForward = DB::table('incoming_document_forward_recipients')
+                ->where('incoming_document_id', $incomingDocument->id)
+                ->whereNotNull('date_received')
+                ->exists();
+        }
+
+        if ($hasBeenReceived || $hasBeenReceivedForward) {
+            return response()->json(['success' => false, 'message' => 'Document has already been received and cannot be deleted.'], 400);
+        }
+
+        DB::transaction(function () use ($incomingDocument, $userId) {
+            $locked = IncomingDocument::query()
+                ->whereKey($incomingDocument->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $fromStatus = (string) $locked->current_status;
+
+            $payload = [
+                'current_status' => 'ARCHIVED',
+            ];
+            if (Schema::hasColumn('incoming_documents', 'is_archived')) {
+                $payload['is_archived'] = true;
+            }
+
+            $locked->update($payload);
+            $locked->delete();
+
+            DocumentLog::create([
+                'incoming_document_id' => $locked->id,
+                'user_id' => $userId,
+                'action_type' => 'ARCHIVED',
+                'action_timestamp' => now(),
+                'status_from' => $fromStatus,
+                'status_to' => 'ARCHIVED',
+                'remarks' => 'Deleted/Archived via Desktop Client',
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Document deleted successfully.',
+        ]);
+    }
+
+    public function desktopCreateSource(Request $request)
+    {
+        $validated = $request->validate([
+            'source_type' => ['required', 'in:section,staff'],
+            'name' => [
+                'required',
+                'string',
+                'max:150',
+                Rule::unique('document_sources', 'name')
+                    ->where(fn ($query) => $query->where('source_type', $request->input('source_type'))),
+            ],
+            'is_active' => ['required', 'in:0,1'],
+        ]);
+        $source = DocumentSource::create($validated);
+
+        return response()->json(['success' => true, 'data' => $source], 201);
+    }
+
+    public function desktopCreateType(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:150', Rule::unique('document_types', 'name')],
+            'is_active' => ['required', 'in:0,1'],
+        ]);
+        $type = DocumentType::create($validated);
+
+        return response()->json(['success' => true, 'data' => $type], 201);
+    }
+
+    public function desktopLogs(Request $request, IncomingDocument $incomingDocument)
+    {
+        $userId = (int) $request->input('user_id', 0);
+        
+        $canAddUpdate = false;
+        if ($userId > 0) {
+            if (Schema::hasColumn('incoming_documents', 'created_by')) {
+                $canAddUpdate = (int) $incomingDocument->created_by === $userId;
+            }
+            if (! $canAddUpdate) {
+                $canAddUpdate = (int) $incomingDocument->received_by === $userId;
+            }
+            if (! $canAddUpdate) {
+                $canAddUpdate = (int) $incomingDocument->forwarded_to_user_id === $userId;
+            }
+            if (! $canAddUpdate && Schema::hasColumn('incoming_documents', 'forwarded_to_group_id') && $incomingDocument->forwarded_to_group_id) {
+                $userGroupId = User::where('id', $userId)->value('group_id');
+                $canAddUpdate = (int) $userGroupId === (int) $incomingDocument->forwarded_to_group_id;
+            }
+            if (! $canAddUpdate && Schema::hasTable('incoming_document_forward_recipients')) {
+                $canAddUpdate = DB::table('incoming_document_forward_recipients')
+                    ->where('incoming_document_id', $incomingDocument->id)
+                    ->where('user_id', $userId)
+                    ->exists();
+            }
+        }
+
+        $isAdminUser = false;
+        if ($userId > 0) {
+            $user = User::find($userId);
+            if ($user) {
+                if ((int) $user->id === 1) {
+                    if (! Schema::hasColumn('users', 'level_id')) {
+                        $isAdminUser = true;
+                    } else {
+                        $isAdminUser = (int) ($user->level_id ?? 0) === 0 || (int) ($user->level_id ?? 0) === 1;
+                    }
+                } else {
+                    $isAdminUser = Schema::hasColumn('users', 'level_id') && (int) ($user->level_id ?? 0) === 1;
+                }
+            }
+        }
+
+        $logs = DocumentLog::query()
+            ->where('incoming_document_id', $incomingDocument->id)
+            ->with(['user', 'relatedUser', 'relatedSource'])
+            ->orderBy('action_timestamp')
+            ->get();
+
+        $receivedInBehalfNames = [];
+        if (
+            Schema::hasTable('incoming_document_forward_recipients')
+            && Schema::hasColumn('incoming_document_forward_recipients', 'received_in_behalf')
+        ) {
+            $pairs = $logs
+                ->filter(fn ($l) => (string) ($l->action_type ?? '') === 'INBOX_RECEIVED')
+                ->map(function ($l) {
+                    return [
+                        'doc_id' => (int) ($l->incoming_document_id ?? 0),
+                        'user_id' => (int) ($l->related_user_id ?? 0),
+                    ];
+                })
+                ->filter(fn ($p) => $p['doc_id'] > 0 && $p['user_id'] > 0)
+                ->values();
+
+            if ($pairs->count() > 0) {
+                $docIds = $pairs->pluck('doc_id')->unique()->values()->all();
+                $pairKeys = $pairs
+                    ->map(fn ($p) => $p['doc_id'].':'.$p['user_id'])
+                    ->flip();
+
+                $rows = DB::table('incoming_document_forward_recipients')
+                    ->whereIn('incoming_document_id', $docIds)
+                    ->whereNotNull('received_in_behalf')
+                    ->select(['incoming_document_id', 'user_id', 'received_in_behalf'])
+                    ->get();
+
+                $numericUserIds = $rows
+                    ->map(function ($r) {
+                        $raw = is_string($r->received_in_behalf) ? trim($r->received_in_behalf) : $r->received_in_behalf;
+                        return is_numeric($raw) ? (int) $raw : 0;
+                    })
+                    ->filter(fn ($v) => $v > 0)
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                $namesById = [];
+                if ($numericUserIds !== []) {
+                    $namesById = User::query()
+                        ->whereIn('id', $numericUserIds)
+                        ->pluck('name', 'id')
+                        ->map(fn ($v) => (string) $v)
+                        ->all();
+                }
+
+                foreach ($rows as $r) {
+                    $docId = (int) ($r->incoming_document_id ?? 0);
+                    $userIdPair = (int) ($r->user_id ?? 0);
+                    $key = $docId.':'.$userIdPair;
+                    if (! isset($pairKeys[$key])) {
+                        continue;
+                    }
+
+                    $raw = is_string($r->received_in_behalf) ? trim($r->received_in_behalf) : $r->received_in_behalf;
+                    $name = '';
+                    if (is_numeric($raw) && (int) $raw > 0) {
+                        $name = (string) ($namesById[(int) $raw] ?? '');
+                    } else {
+                        $name = is_string($raw) ? $raw : '';
+                    }
+
+                    if (trim($name) !== '') {
+                        $receivedInBehalfNames[$key] = $name;
+                    }
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'logs' => $logs,
+            'received_in_behalf_names' => (object) $receivedInBehalfNames,
+            'can_add_update' => $canAddUpdate,
+            'is_admin_user' => $isAdminUser,
+        ]);
+    }
+
+    public function desktopAddUpdateLog(Request $request, IncomingDocument $incomingDocument)
+    {
+        $userId = (int) $request->input('user_id', 0);
+        $user = User::findOrFail($userId);
+
+        $isAdmin = false;
+        if ((int) $user->id === 1) {
+            if (! Schema::hasColumn('users', 'level_id')) {
+                $isAdmin = true;
+            } else {
+                $isAdmin = (int) ($user->level_id ?? 0) === 0 || (int) ($user->level_id ?? 0) === 1;
+            }
+        } else {
+            $isAdmin = Schema::hasColumn('users', 'level_id') && (int) ($user->level_id ?? 0) === 1;
+        }
+
+        if (! $isAdmin) {
+            $canAddUpdate = false;
+            if (Schema::hasColumn('incoming_documents', 'created_by')) {
+                $canAddUpdate = (int) $incomingDocument->created_by === $userId;
+            }
+            if (! $canAddUpdate) {
+                $canAddUpdate = (int) $incomingDocument->received_by === $userId;
+            }
+            if (! $canAddUpdate) {
+                $canAddUpdate = (int) $incomingDocument->forwarded_to_user_id === $userId;
+            }
+            if (! $canAddUpdate && Schema::hasColumn('incoming_documents', 'forwarded_to_group_id') && $incomingDocument->forwarded_to_group_id) {
+                $userGroupId = User::where('id', $userId)->value('group_id');
+                $canAddUpdate = (int) $userGroupId === (int) $incomingDocument->forwarded_to_group_id;
+            }
+            if (! $canAddUpdate && Schema::hasTable('incoming_document_forward_recipients')) {
+                $canAddUpdate = DB::table('incoming_document_forward_recipients')
+                    ->where('incoming_document_id', $incomingDocument->id)
+                    ->where('user_id', $userId)
+                    ->exists();
+            }
+
+            if (! $canAddUpdate) {
+                return response()->json(['message' => 'Forbidden.'], 403);
+            }
+        }
+
+        $validated = $request->validate([
+            'manual_update_party' => ['nullable', 'in:to,from'],
+            'document_from_type' => ['required', 'in:section,staff'],
+            'return_from_document_source_id' => ['required', 'integer', 'exists:document_sources,id,is_active,1'],
+            'update_text' => ['required', 'string', 'min:1'],
+        ]);
+
+        $source = DocumentSource::findOrFail((int) $validated['return_from_document_source_id']);
+        if ((string) $source->source_type !== (string) $validated['document_from_type']) {
+            throw ValidationException::withMessages([
+                'return_from_document_source_id' => ['Return from must match the selected Document From type.'],
+            ]);
+        }
+
+        DocumentLog::create([
+            'incoming_document_id' => $incomingDocument->id,
+            'user_id' => $userId,
+            'action_type' => 'UPDATED',
+            'action_timestamp' => now(),
+            'remarks' => json_encode([
+                'kind' => 'manual_update_v1',
+                'party' => (string) ($validated['manual_update_party'] ?? 'from'),
+                'document_from_type' => $validated['document_from_type'],
+                'return_from' => [
+                    'id' => $source->id,
+                    'name' => $source->name,
+                    'source_type' => $source->source_type,
+                ],
+                'update_text' => $validated['update_text'],
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function desktopUpdateLog(Request $request, IncomingDocument $incomingDocument, DocumentLog $documentLog)
+    {
+        if ((int) $documentLog->incoming_document_id !== (int) $incomingDocument->id) {
+            return response()->json(['message' => 'Log not found.'], 404);
+        }
+
+        $userId = (int) $request->input('user_id', 0);
+        $user = User::findOrFail($userId);
+
+        $isOwner = (int) ($documentLog->user_id ?? 0) === $userId;
+        
+        $isAdmin = false;
+        if ((int) $user->id === 1) {
+            if (! Schema::hasColumn('users', 'level_id')) {
+                $isAdmin = true;
+            } else {
+                $isAdmin = (int) ($user->level_id ?? 0) === 0 || (int) ($user->level_id ?? 0) === 1;
+            }
+        } else {
+            $isAdmin = Schema::hasColumn('users', 'level_id') && (int) ($user->level_id ?? 0) === 1;
+        }
+
+        if (! $isOwner && ! $isAdmin) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
+        $rawRemarks = (string) ($documentLog->remarks ?? '');
+        $decoded = json_decode($rawRemarks, true);
+        $jsonOk = json_last_error() === JSON_ERROR_NONE;
+        $isManualUpdate = is_array($decoded) && ($decoded['kind'] ?? null) === 'manual_update_v1';
+
+        if ($isManualUpdate) {
+            $validated = $request->validate([
+                'update_text' => ['required', 'string', 'min:1'],
+            ]);
+
+            $decoded['update_text'] = trim((string) $validated['update_text']);
+            $documentLog->remarks = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $documentLog->save();
+
+            return response()->json([
+                'success' => 'Log updated successfully.',
+                'data' => [
+                    'id' => $documentLog->id,
+                    'mode' => 'manual_update',
+                    'update_text' => (string) ($decoded['update_text'] ?? ''),
+                ],
+            ]);
+        }
+
+        if ($rawRemarks !== '' && $jsonOk) {
+            return response()->json(['message' => 'This log is not editable.'], 422);
+        }
+
+        $validated = $request->validate([
+            'remarks' => ['nullable', 'string'],
+        ]);
+
+        $remarks = trim((string) ($validated['remarks'] ?? ''));
+        $documentLog->remarks = $remarks !== '' ? $remarks : null;
+        $documentLog->save();
+
+        return response()->json([
+            'success' => 'Log updated successfully.',
+            'data' => [
+                'id' => $documentLog->id,
+                'mode' => 'remarks',
+                'remarks' => (string) ($documentLog->remarks ?? ''),
+            ],
+        ]);
+    }
+
+    public function desktopLookupSources()
+    {
+        $returnFromSources = DocumentSource::query()
+            ->whereNull('deleted_at')
+            ->where('is_active', 1)
+            ->orderBy('source_type')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'sources' => $returnFromSources,
+        ]);
+    }
+
+    public function desktopForward(Request $request, IncomingDocument $incomingDocument)
+    {
+        $userId = (int) $request->input('user_id', 0);
+        $user = User::findOrFail($userId);
+
+        $isAllowed = false;
+        if (Schema::hasColumn('incoming_documents', 'created_by')) {
+            $isAllowed = (int) $incomingDocument->created_by === $userId;
+        }
+        if (! $isAllowed) {
+            $isAllowed = (int) $incomingDocument->received_by === $userId;
+        }
+        if (! $isAllowed) {
+            $isAllowed = (int) $incomingDocument->forwarded_to_user_id === $userId;
+        }
+        if (! $isAllowed && Schema::hasColumn('incoming_documents', 'forwarded_to_group_id') && $incomingDocument->forwarded_to_group_id) {
+            $userGroupId = User::where('id', $userId)->value('group_id');
+            $isAllowed = (int) $userGroupId === (int) $incomingDocument->forwarded_to_group_id;
+        }
+        if (! $isAllowed && Schema::hasTable('incoming_document_forward_recipients')) {
+            $isAllowed = DB::table('incoming_document_forward_recipients')
+                ->where('incoming_document_id', $incomingDocument->id)
+                ->where('user_id', $userId)
+                ->exists();
+        }
+
+        $isAdmin = false;
+        if ((int) $user->id === 1) {
+            if (! Schema::hasColumn('users', 'level_id')) {
+                $isAdmin = true;
+            } else {
+                $isAdmin = (int) ($user->level_id ?? 0) === 0 || (int) ($user->level_id ?? 0) === 1;
+            }
+        } else {
+            $isAdmin = Schema::hasColumn('users', 'level_id') && (int) ($user->level_id ?? 0) === 1;
+        }
+
+        if (! $isAllowed && ! $isAdmin) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+        if (! $this->hasUserReceivedDocument($incomingDocument, $userId)) {
+            return response()->json([
+                'message' => 'Receive the document before forwarding it.',
+            ], 422);
+        }
+
+        $request->validate([
+            'forward_to' => ['required', 'in:user,group'],
+            'forward_staff_mode' => ['nullable', 'in:0,1'],
+            'forwarded_to_user_id' => [
+                Rule::requiredIf($request->input('forward_to') === 'user'),
+                'nullable',
+                'integer',
+                'exists:users,id',
+                Rule::notIn([$userId]),
+            ],
+            'forwarded_to_group_id' => [
+                Rule::requiredIf($request->input('forward_to') === 'group' && (string) $request->input('forward_staff_mode', '0') !== '1'),
+                'nullable',
+                'integer',
+                Rule::exists('group', 'id')->where(fn ($q) => $q->where('status', 1)),
+            ],
+            'forwarded_to_user_ids' => [
+                Rule::requiredIf($request->input('forward_to') === 'group' && (string) $request->input('forward_staff_mode', '0') === '1'),
+                'array',
+                'min:1',
+                'max:20',
+            ],
+            'forwarded_to_user_ids.*' => [
+                'integer',
+                Rule::exists('users', 'id'),
+                Rule::notIn([$userId]),
+            ],
+            'forward_remarks' => ['nullable', 'string'],
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $fromStatus = $incomingDocument->current_status;
+            $isStaffMode = $request->input('forward_to') === 'group' && (string) $request->input('forward_staff_mode', '0') === '1';
+            $addedIds = [];
+
+            $payload = [
+                'current_status' => 'FORWARDED',
+                'forwarded_to_user_id' => null,
+                'forwarded_to_source_id' => null,
+                'date_forwarded' => now(),
+                'forward_remarks' => $request->input('forward_remarks'),
+            ];
+
+            if (Schema::hasColumn('incoming_documents', 'forwarded_to_group_id')) {
+                $payload['forwarded_to_group_id'] = null;
+            }
+
+            if ($request->input('forward_to') === 'user') {
+                $payload['forwarded_to_user_id'] = (int) $request->input('forwarded_to_user_id');
+            }
+            if ($request->input('forward_to') === 'group' && ! $isStaffMode && Schema::hasColumn('incoming_documents', 'forwarded_to_group_id')) {
+                $payload['forwarded_to_group_id'] = (int) $request->input('forwarded_to_group_id');
+            }
+
+            $incomingDocument->update($payload);
+
+            $existingRecipients = DB::table('incoming_document_forward_recipients')
+                ->where('incoming_document_id', $incomingDocument->id)
+                ->get(['id', 'user_id'])
+                ->keyBy(fn ($recipient) => (int) $recipient->user_id);
+
+            $candidateIds = [];
+            if ($request->input('forward_to') === 'user') {
+                $candidateIds = [(int) $request->input('forwarded_to_user_id')];
+            } elseif ($isStaffMode) {
+                $candidateIds = array_values(array_map('intval', (array) $request->input('forwarded_to_user_ids', [])));
+            } else {
+                $groupId = (int) $request->input('forwarded_to_group_id');
+                $candidateIds = DB::table('users')->where('group_id', $groupId)->pluck('id')->map(fn ($v) => (int) $v)->all();
+            }
+            $candidateIds = array_values(array_unique($candidateIds));
+            $candidateIds = array_values(array_filter($candidateIds, fn ($id) => (int) $id !== $userId));
+
+            $toInsert = [];
+            $now = now();
+            foreach ($candidateIds as $uid) {
+                $existingRecipient = $existingRecipients->get($uid);
+                if ($existingRecipient) {
+                    $resetPayload = [
+                        'updated_at' => $now,
+                    ];
+                    foreach (['date_received', 'received_by', 'received_in_behalf', 'batch_id'] as $column) {
+                        if (Schema::hasColumn('incoming_document_forward_recipients', $column)) {
+                            $resetPayload[$column] = null;
+                        }
+                    }
+
+                    DB::table('incoming_document_forward_recipients')
+                        ->where('id', (int) $existingRecipient->id)
+                        ->update($resetPayload);
+                } else {
+                    $toInsert[] = [
+                        'incoming_document_id' => $incomingDocument->id,
+                        'user_id' => $uid,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+            }
+
+            if (! empty($toInsert)) {
+                DB::table('incoming_document_forward_recipients')->insert($toInsert);
+            }
+
+            $addedIds = $candidateIds;
+            if (! empty($addedIds)) {
+                $recipients = DB::table('incoming_document_forward_recipients')
+                    ->where('incoming_document_id', $incomingDocument->id)
+                    ->whereIn('user_id', $addedIds)
+                    ->get(['id', 'user_id']);
+
+                foreach ($recipients as $recipient) {
+                    $recipientRecordId = (int) $recipient->id;
+                    $recipientUserId = (int) $recipient->user_id;
+
+                    event(new \App\Events\DocumentRouted($recipientUserId, [
+                        'recipient_id' => $recipientRecordId,
+                        'document_id' => $incomingDocument->id,
+                        'tracking_number' => $incomingDocument->document_reference_number,
+                        'drn' => $incomingDocument->drn,
+                        'subject' => $incomingDocument->subject,
+                        'document_type' => $incomingDocument->type->name ?? 'Standard',
+                        'origin_office' => $incomingDocument->source->name ?? 'N/A',
+                        'sender' => $user->name ?? 'System',
+                        'date_routed' => now()->toDateTimeString(),
+                        'remarks' => $request->input('forward_remarks') ?: 'None'
+                    ]));
+                }
+            }
+
+            $logRemarks = $request->input('forward_remarks');
+            $relatedUserId = $payload['forwarded_to_user_id'] ?? null;
+            if ($request->input('forward_to') === 'group') {
+                $mode = $isStaffMode ? 'staff' : 'group';
+                $groupId = ! $isStaffMode ? (int) $request->input('forwarded_to_group_id') : null;
+                $groupName = null;
+                if (! $isStaffMode) {
+                    $groupName = (string) (DB::table('group')->where('id', $groupId)->value('group_name') ?? '');
+                }
+                $recipients = User::query()
+                    ->whereIn('id', $addedIds)
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn ($u) => ['id' => (int) $u->id, 'name' => mb_strtoupper((string) $u->name, 'UTF-8')])
+                    ->all();
+
+                $logRemarks = json_encode([
+                    'kind' => 'forward_recipients_v1',
+                    'mode' => $mode,
+                    'group' => ! $isStaffMode ? ['id' => $groupId, 'name' => $groupName] : null,
+                    'recipients' => $recipients,
+                    'added_user_ids' => $addedIds,
+                    'duplicate_user_ids' => [],
+                    'note' => $request->input('forward_remarks'),
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $relatedUserId = null;
+            }
+
+            if (! empty($addedIds)) {
+                DocumentLog::create([
+                    'incoming_document_id' => $incomingDocument->id,
+                    'user_id' => $userId,
+                    'action_type' => 'FORWARDED',
+                    'action_timestamp' => now(),
+                    'status_from' => $fromStatus,
+                    'status_to' => 'FORWARDED',
+                    'related_user_id' => $relatedUserId,
+                    'related_source_id' => null,
+                    'remarks' => $logRemarks,
+                ]);
+            }
+
+            DB::commit();
+        } catch (\Throwable $t) {
+            DB::rollBack();
+            throw $t;
+        }
+
+        if (empty($addedIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No eligible recipients were selected.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Document forwarded successfully!',
+        ]);
+    }
+
+    /**
+     * Serves the update JSON metadata according to Tauri's update protocol.
+     */
+    public function desktopUpdate(Request $request)
+    {
+        $releaseVersion = '1.0.11';
+        $artifactName = 'afs-app_1.0.11_x64_en-US.msi.zip';
+        $artifactPath = public_path('downloads/'.$artifactName);
+        $signaturePath = $artifactPath.'.sig';
+        $currentVersion = $request->query('current_version', $request->query('version', '1.0.0'));
+
+        if (version_compare($currentVersion, $releaseVersion, '>=')) {
+            return response()->json(null, 204);
+        }
+
+        if (! is_file($artifactPath) || ! is_readable($artifactPath) || ! is_file($signaturePath) || ! is_readable($signaturePath)) {
+            return response()->json([
+                'message' => 'The desktop update artifact is not available.',
+            ], 503);
+        }
+
+        // Build the artifact URL from the server that handled this request.
+        // Using url() here can leak a development APP_URL such as localhost,
+        // which makes installed clients try to download from their own PC.
+        $artifactUrl = rtrim($request->root(), '/').'/downloads/'.rawurlencode($artifactName);
+
+        return response()->json([
+            'version' => $releaseVersion,
+            'pub_date' => '2026-07-28T08:15:00Z',
+            'notes' => 'Version 1.0.11 checks for updates immediately when the desktop app opens, downloads and installs available updates automatically, then restarts the app. The working preloaded routed-document popup flow is preserved.',
+            'platforms' => [
+                'windows-x86_64' => [
+                    'signature' => trim((string) file_get_contents($signaturePath)),
+                    'url' => $artifactUrl,
+                ]
+            ]
+        ]);
     }
 }

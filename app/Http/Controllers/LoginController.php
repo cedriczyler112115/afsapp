@@ -553,6 +553,77 @@ class LoginController extends Controller
     }
 
     /**
+     * Handle desktop application login API request against database users table.
+     */
+    public function desktopLogin(Request $request)
+    {
+        $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required'],
+        ]);
+
+        $user = User::where('email', $credentials['email'])->first();
+
+        if (! $user || ! Hash::check($credentials['password'], (string) $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The provided credentials do not match our records in the database.',
+            ], 401);
+        }
+
+        if (Schema::hasColumn('users', 'is_status') && (int) $user->is_status === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account is pending approval. Please wait for activation.',
+            ], 403);
+        }
+
+        Auth::login($user, true);
+        $request->session()->regenerate();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Login successful',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'google_id' => $user->google_id ?? null,
+                'google_name' => $user->google_name ?? null,
+                'google_email' => $user->google_email ?? null,
+                'is_status' => $user->is_status ?? 1,
+            ],
+        ]);
+    }
+
+    /**
+     * Return current authenticated user for desktop app.
+     */
+    public function desktopMe(Request $request)
+    {
+        if (Auth::check()) {
+            $user = Auth::user();
+            return response()->json([
+                'success' => true,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'google_id' => $user->google_id ?? null,
+                    'google_name' => $user->google_name ?? null,
+                    'google_email' => $user->google_email ?? null,
+                    'is_status' => $user->is_status ?? 1,
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'user' => null,
+        ], 401);
+    }
+
+    /**
      * Log the user out of the application.
      */
     public function logout(Request $request)
@@ -562,6 +633,10 @@ class LoginController extends Controller
         $request->session()->invalidate();
 
         $request->session()->regenerateToken();
+
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true]);
+        }
 
         return redirect('/');
     }

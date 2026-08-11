@@ -10,6 +10,7 @@ class Issuance extends Model
 
     protected $casts = [
         'date_issued' => 'datetime',
+        'damage_photos_path' => 'array',
     ];
 
     public function user()

@@ -200,11 +200,11 @@
 
         <!-- Meta Info -->
         <div class="meta-info">
-            <table class="table table-borderless">
+            <table class="table table-borderless" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 20px;">
                 <tr>
-                    <td style="width: auto"><strong>Purpose / Remarks:</strong></td>
-                    <td>{{ $group->purpose }}</td>
-                    <td style="width: 150px"><strong>Date Printed:</strong></td>
+                    <td style="width: 17%"><strong>Purpose / Remarks:</strong></td>
+                    <td style="width: 40%">{{ $group->purpose }}</td>
+                    <td style="width: 12%"><strong>Date Printed:</strong></td>
                     <td>{{ $group->date_printed->format('F d, Y h:i A') }}</td>
                 </tr>
                 <tr>

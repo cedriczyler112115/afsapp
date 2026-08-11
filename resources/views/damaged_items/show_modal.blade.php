@@ -53,6 +53,22 @@
                         </div>
                     </div>
                 @endforeach
+
+                @if(!empty($damagePhotos) && $damagePhotos->count())
+                    <h6 class="fw-bold text-secondary mt-4 mb-3">Damage Photos</h6>
+                    <div class="row g-3">
+                        @foreach($damagePhotos as $photo)
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <a href="{{ $photo['url'] }}" target="_blank" class="d-block text-decoration-none">
+                                    <img src="{{ $photo['url'] }}"
+                                         alt="Damage photo"
+                                         class="img-fluid rounded border"
+                                         style="width: 100%; height: 180px; object-fit: cover;">
+                                </a>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -60,4 +76,3 @@
         </div>
     </div>
 </div>
-

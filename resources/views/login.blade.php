@@ -4,7 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Login - Stock Inventory Management System</title>
+    <title>Sign in | 4Ps AFS Information System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
@@ -307,20 +310,435 @@
             margin: 0 0 12px;
             color: rgba(15, 23, 42, 0.78);
         }
+
+        /* Application-aligned authentication shell */
+        body {
+            background:
+                radial-gradient(circle at 8% 12%, rgba(37, 99, 235, .12), transparent 30%),
+                radial-gradient(circle at 92% 88%, rgba(14, 165, 233, .10), transparent 32%),
+                #f8fafc;
+            font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+        }
+
+        .auth {
+            align-items: center;
+            padding: clamp(20px, 4vw, 48px);
+        }
+
+        .auth-card {
+            display: grid;
+            grid-template-columns: minmax(300px, .72fr) minmax(0, 1.45fr);
+            width: min(1180px, 100%);
+            min-height: 680px;
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            background: #fff;
+            box-shadow: 0 24px 70px rgba(15, 23, 42, .13);
+            backdrop-filter: none;
+        }
+
+        .auth-showcase {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            padding: 38px 34px 30px;
+            color: #fff;
+            background:
+                linear-gradient(155deg, rgba(15, 23, 42, .96), rgba(30, 64, 175, .94)),
+                #0f172a;
+        }
+
+        .auth-showcase::before,
+        .auth-showcase::after {
+            position: absolute;
+            content: "";
+            border-radius: 999px;
+            pointer-events: none;
+        }
+
+        .auth-showcase::before {
+            top: -80px;
+            right: -100px;
+            width: 280px;
+            height: 280px;
+            border: 48px solid rgba(255, 255, 255, .055);
+        }
+
+        .auth-showcase::after {
+            right: -55px;
+            bottom: -85px;
+            width: 220px;
+            height: 220px;
+            background: rgba(56, 189, 248, .11);
+        }
+
+        .showcase-brand,
+        .showcase-content,
+        .showcase-footer {
+            position: relative;
+            z-index: 1;
+        }
+
+        .showcase-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .showcase-logo {
+            width: 54px;
+            height: 54px;
+            padding: 4px;
+            object-fit: cover;
+            border: 1px solid rgba(255, 255, 255, .35);
+            border-radius: 14px;
+            background: #fff;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, .22);
+        }
+
+        .showcase-agency {
+            color: #bfdbfe;
+            font-size: .7rem;
+            font-weight: 700;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+        }
+
+        .showcase-system {
+            margin-top: 2px;
+            font-size: .95rem;
+            font-weight: 700;
+        }
+
+        .showcase-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 16px;
+            padding: 6px 10px;
+            border: 1px solid rgba(147, 197, 253, .28);
+            border-radius: 999px;
+            color: #dbeafe;
+            background: rgba(30, 64, 175, .28);
+            font-size: .68rem;
+            font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+        }
+
+        .showcase-content h1 {
+            max-width: 410px;
+            margin: 0;
+            font-size: clamp(1.65rem, 3vw, 2.3rem);
+            font-weight: 800;
+            line-height: 1.15;
+            letter-spacing: -.035em;
+        }
+
+        .showcase-content > p {
+            max-width: 390px;
+            margin: 15px 0 24px;
+            color: #cbd5e1;
+            font-size: .84rem;
+            line-height: 1.65;
+        }
+
+        .showcase-features {
+            display: grid;
+            gap: 11px;
+        }
+
+        .showcase-feature {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #e2e8f0;
+            font-size: .77rem;
+            font-weight: 500;
+        }
+
+        .showcase-feature i {
+            display: grid;
+            place-items: center;
+            width: 28px;
+            height: 28px;
+            flex: 0 0 auto;
+            border-radius: 8px;
+            color: #93c5fd;
+            background: rgba(255, 255, 255, .08);
+        }
+
+        .showcase-footer {
+            color: #94a3b8;
+            font-size: .68rem;
+            line-height: 1.5;
+        }
+
+        .auth-workspace {
+            display: flex;
+            min-width: 0;
+            flex-direction: column;
+            background: #fff;
+        }
+
+        .auth-header {
+            min-height: 82px;
+            padding: 20px 30px;
+            border-bottom-color: #e2e8f0;
+        }
+
+        .auth-brand {
+            min-width: 0;
+        }
+
+        .auth-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: #2563eb;
+            box-shadow: 0 8px 20px rgba(37, 99, 235, .2);
+        }
+
+        .auth-title {
+            color: #0f172a;
+            font-size: 1rem;
+            letter-spacing: -.015em;
+        }
+
+        .auth-subtitle {
+            color: #64748b;
+            font-size: .72rem;
+        }
+
+        .auth-actions {
+            padding: 3px;
+            gap: 3px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+
+        .auth-actions .btn-auth {
+            min-width: 76px;
+            padding: 7px 11px;
+            border: 0;
+            border-radius: 7px;
+            font-size: .72rem;
+            box-shadow: none;
+        }
+
+        .auth:not(.is-register) #authToLogin,
+        .auth.is-register #authToRegister {
+            color: #fff;
+            background: #2563eb;
+        }
+
+        .auth:not(.is-register) #authToRegister,
+        .auth.is-register #authToLogin {
+            color: #475569;
+            background: transparent;
+        }
+
+        .auth-body {
+            width: 100%;
+            max-width: 760px;
+            margin: auto;
+            padding: 34px clamp(28px, 5vw, 58px) 38px;
+        }
+
+        .auth-panel--login {
+            max-width: 470px;
+            margin: 0 auto;
+        }
+
+        .auth-panel h3 {
+            color: #0f172a;
+            font-size: 1.45rem;
+            letter-spacing: -.03em;
+        }
+
+        .auth-card .form-label {
+            color: #334155;
+            font-size: .74rem;
+            font-weight: 600 !important;
+        }
+
+        .auth-card .form-control,
+        .auth-card .form-select {
+            min-height: 43px;
+            padding: 9px 12px;
+            border-color: #cbd5e1;
+            border-radius: 9px;
+            color: #0f172a;
+            background: #fff;
+            font-size: .82rem;
+        }
+
+        .auth-card .form-control::placeholder {
+            color: #94a3b8;
+        }
+
+        .auth-card .form-control:focus,
+        .auth-card .form-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, .13);
+        }
+
+        .btn-auth {
+            min-height: 41px;
+            padding: 9px 13px;
+            border-radius: 9px;
+            font-size: .8rem;
+            letter-spacing: 0;
+        }
+
+        .btn-auth-primary {
+            background: #2563eb;
+            box-shadow: 0 8px 18px rgba(37, 99, 235, .2);
+        }
+
+        .btn-auth-primary:hover {
+            color: #fff;
+            background: #1d4ed8;
+            filter: none;
+        }
+
+        .form-check-label,
+        .auth-card a,
+        .auth-card .text-secondary {
+            font-size: .76rem;
+        }
+
+        .auth-card .alert {
+            padding: 10px 12px;
+            border-radius: 9px;
+            font-size: .76rem;
+        }
+
+        .auth-trust-note {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-top: 18px;
+            color: #64748b;
+            font-size: .68rem;
+            line-height: 1.45;
+        }
+
+        .auth-trust-note i {
+            color: #16a34a;
+        }
+
+        @media (max-width: 900px) {
+            .auth-card {
+                display: block;
+                width: min(680px, 100%);
+            }
+            .auth-showcase {
+                min-height: 210px;
+                padding: 24px;
+            }
+            .showcase-content {
+                margin: 32px 0 12px;
+            }
+            .showcase-content h1 {
+                font-size: 1.65rem;
+            }
+            .showcase-content > p,
+            .showcase-features {
+                display: none;
+            }
+        }
+
+        @media (max-width: 575px) {
+            .auth {
+                align-items: flex-start;
+                padding: 0;
+                background: #fff;
+            }
+            .auth-card {
+                min-height: 100vh;
+                border: 0;
+                border-radius: 0;
+                box-shadow: none;
+            }
+            .auth-showcase {
+                min-height: 155px;
+                padding: 20px;
+            }
+            .showcase-content {
+                margin: 20px 0 0;
+            }
+            .showcase-content h1 {
+                font-size: 1.35rem;
+            }
+            .showcase-eyebrow,
+            .showcase-footer {
+                display: none;
+            }
+            .auth-header {
+                padding: 15px 18px;
+            }
+            .auth-brand {
+                display: none;
+            }
+            .auth-actions {
+                width: 100%;
+            }
+            .auth-actions .btn-auth {
+                flex: 1;
+            }
+            .auth-body {
+                padding: 28px 20px 34px;
+            }
+            .g-recaptcha {
+                transform: scale(.88);
+                transform-origin: left center;
+            }
+        }
     </style>
 </head>
 <body>
 
 <main class="auth {{ ($showRegister ?? false) ? 'is-register' : '' }}" id="authRoot">
     <div class="auth-card">
+        <aside class="auth-showcase" aria-label="System information">
+            <div class="showcase-brand">
+                <img src="{{ asset('img/4pslogo.jpg') }}" alt="4Ps logo" class="showcase-logo">
+                <div>
+                    <div class="showcase-agency">DSWD Field Office</div>
+                    <div class="showcase-system">4Ps AFS Information System</div>
+                </div>
+            </div>
+
+            <div class="showcase-content">
+                <div class="showcase-eyebrow"><i class="bi bi-shield-check"></i> Secure government workspace</div>
+                <h1>Document tracking with clarity and accountability.</h1>
+                <p>Access the Admin Facilitation Section workspace to receive, route, monitor, and manage official documents securely.</p>
+                <div class="showcase-features">
+                    <div class="showcase-feature"><i class="bi bi-signpost-split"></i><span>End-to-end document routing and tracking</span></div>
+                    <div class="showcase-feature"><i class="bi bi-clock-history"></i><span>Complete activity history and accountability</span></div>
+                    <div class="showcase-feature"><i class="bi bi-people"></i><span>Secure staff and section collaboration</span></div>
+                </div>
+            </div>
+
+            <div class="showcase-footer">
+                Department of Social Welfare and Development<br>
+                Pantawid Pamilyang Pilipino Program
+            </div>
+        </aside>
+
+        <div class="auth-workspace">
         <div class="auth-header">
             <div class="auth-brand">
                 <div class="auth-logo">
-                    <i class="bi bi-box-seam-fill fs-4"></i>
+                    <i class="bi bi-file-earmark-lock-fill"></i>
                 </div>
                 <div>
                     <p class="auth-title">4Ps AFS-IS</p>
-                    <p class="auth-subtitle">4Ps Admin Portal</p>
+                    <p class="auth-subtitle">Document Tracking and Management</p>
                 </div>
             </div>
             <div class="auth-actions">
@@ -339,7 +757,7 @@
             <div class="auth-panels">
                 <section id="loginWrapper" class="auth-panel auth-panel--login" aria-hidden="{{ ($showRegister ?? false) ? 'true' : 'false' }}">
                     <h3 class="fw-bold mb-1">Welcome back</h3>
-                    <p class="text-secondary mb-4">Sign in to continue.</p>
+                    <p class="text-secondary mb-4">Use your authorized account to access the document tracking workspace.</p>
 
                     @if ($errors->login->any())
                         <div class="alert alert-danger mb-4">
@@ -420,6 +838,11 @@
                         <div class="text-center text-secondary">
                             Don't have an account?
                             <a href="{{ route('register') }}" class="text-decoration-none fw-semibold" id="showRegisterLink">Create one</a>
+                        </div>
+
+                        <div class="auth-trust-note">
+                            <i class="bi bi-lock-fill"></i>
+                            <span>Your session is protected. Access is restricted to authorized personnel and may be monitored for security and audit purposes.</span>
                         </div>
                     </form>
                 </section>
@@ -622,6 +1045,7 @@
                     </form>
                 </section>
             </div>
+        </div>
         </div>
     </div>
 </main>

@@ -17,8 +17,10 @@
 /public/hot
 /public/storage
 /storage/*.key
+/storage/*.key.pub
 /storage/pail
 /vendor
+/tauri-app
 Homestead.json
 Homestead.yaml
 Thumbs.db

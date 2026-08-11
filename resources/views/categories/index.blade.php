@@ -169,7 +169,14 @@
         // Delete Category
         $(document).on('click', '.delete-category', function() {
             let id = $(this).data('id');
-            if (confirm("Are you sure you want to delete this category?")) {
+            window.movableConfirm({
+                title: 'Delete Category',
+                content: 'Are you sure you want to delete this category?',
+                type: 'red',
+                confirmText: 'Delete',
+                confirmClass: 'btn-danger'
+            }).then(function(confirmed) {
+                if (!confirmed) return;
                 $.ajax({
                     url: "{{ url('categories') }}/" + id,
                     type: "DELETE",
@@ -181,7 +188,7 @@
                         alert('Error deleting category');
                     }
                 });
-            }
+            });
         });
     });
 </script>

@@ -213,6 +213,8 @@
         $(document).on('click', '.delete-source', function() {
             let id = $(this).data('id');
             $.confirm({
+                draggable: true,
+                dragWindowBorder: false,
                 title: 'Confirm',
                 content: 'Delete this document source?',
                 buttons: {

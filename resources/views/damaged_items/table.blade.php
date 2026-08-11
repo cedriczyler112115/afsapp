@@ -3,7 +3,7 @@
         <thead class="table-light">
             <tr>
                 <th class="text-nowrap">No</th>
-                <th class="text-center" style="width: 40px;"><input type="checkbox" style="width: 25px;height: 25px;" class="form-check-input form-check-lg" id="select-all"></th>
+                <th class="text-center" style="width: 40px;"><input type="checkbox" class="form-check-input table-header-checkbox damaged-items-checkbox" id="select-all"></th>
                 <th class="text-nowrap">Reported By</th>
                 <th class="text-nowrap">Item (Summary)</th>
                 <th class="text-nowrap">Category</th>
@@ -20,7 +20,7 @@
                 <td>{{ ($issuances->currentPage() - 1) * $issuances->perPage() + $loop->iteration }}</td>
                 <td class="text-center">
                     @if(!$issuance->issuance_group_id)
-                    <input type="checkbox" style="width: 25px;height: 25px;" class="form-check-input form-check-lg issuance-checkbox" value="{{ $issuance->id }}">
+                    <input type="checkbox" class="form-check-input issuance-checkbox damaged-items-checkbox" value="{{ $issuance->id }}">
                     @endif
                 </td>
                 <td>{{ $issuance->receiver_name ?? 'N/A' }}</td>
