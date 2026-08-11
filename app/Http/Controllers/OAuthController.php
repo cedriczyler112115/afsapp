@@ -244,8 +244,6 @@ class OAuthController extends Controller
 
     private function googleRedirectUrl(Request $request): string
     {
-        $baseUrl = rtrim($request->getSchemeAndHttpHost().$request->getBaseUrl(), '/');
-
-        return $baseUrl.'/auth/google/callback';
+        return (string) config('services.google.redirect');
     }
 }
