@@ -67,9 +67,6 @@ class ProfileController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        if ((int) $user->level_id !== 1) {
-            $request->merge(['level_id' => $user->level_id]);
-        }
 
         $request->merge([
             'name' => preg_replace('/\s+/', ' ', trim((string) $request->input('name', ''))),
@@ -79,33 +76,41 @@ class ProfileController extends Controller
 
         $validated = $request->validate([
             'name' => [
-                'required', 'string', 'min:5', 'max:150',
+                'required',
+                'string',
+                'min:5',
+                'max:150',
                 function ($attribute, $value, $fail) {
-                    if (count(preg_split('/\s+/', trim($value))) <= 2) {
-                        $fail('The full name must contain more than 2 words.');
+                    if (count(preg_split('/\s+/', trim($value))) <= 1) {
+                        $fail('The full name must contain more than 2 words for firstname lastname and middle initial or name.');
                     }
                 },
             ],
             'level_id' => ['required', 'integer', Rule::exists('user_level', 'id')],
             'division_id' => ['required', 'integer', Rule::exists('lib_division', 'id')],
             'section_id' => [
-                'required', 'integer',
+                'required',
+                'integer',
                 Rule::exists('lib_section', 'id')->where(function ($q) use ($request) {
                     $q->where('division_id', $request->input('division_id'));
                 }),
             ],
             'province_code' => [
                 Rule::requiredIf(in_array($sectionId, [59, 61], true)),
-                'nullable', 'integer',
+                'nullable',
+                'integer',
                 Rule::exists('lib_provinces', 'prov_code')
             ],
             'cluster' => [
                 Rule::requiredIf($sectionId === 60),
-                'nullable', 'integer', Rule::in([1, 2]),
+                'nullable',
+                'integer',
+                Rule::in([1, 2]),
             ],
             'municipality_code' => [
                 Rule::requiredIf($sectionId === 61),
-                'nullable', 'integer',
+                'nullable',
+                'integer',
                 Rule::exists('lib_cities', 'city_code')->where(function ($q) use ($request) {
                     $q->where('prov_code', $request->input('province_code'));
                 }),
@@ -132,7 +137,10 @@ class ProfileController extends Controller
 
         $rules = [
             'password' => [
-                'required', 'string', 'confirmed', 'min:8',
+                'required',
+                'string',
+                'confirmed',
+                'min:8',
                 'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
             ],
         ];
