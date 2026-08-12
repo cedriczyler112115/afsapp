@@ -67,6 +67,10 @@ class ProfileController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
+        if ((int) $user->level_id !== 1) {
+            $request->merge(['level_id' => $user->level_id]);
+        }
+
         $request->merge([
             'name' => preg_replace('/\s+/', ' ', trim((string) $request->input('name', ''))),
         ]);

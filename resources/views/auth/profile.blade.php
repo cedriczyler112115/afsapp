@@ -57,16 +57,29 @@
 
                             <div class="col-md-6">
                                 <label class="form-label small fw-semibold">User Level</label>
-                                <select name="level_id" class="form-select" required>
-                                    <option value="">Select Level</option>
-                                    @foreach($userLevels as $lvl)
-                                        @if($lvl->level_name !== 'Administrator')
-                                            <option value="{{ $lvl->level_id }}" {{ old('level_id', $user->level_id) == $lvl->level_id ? 'selected' : '' }}>
-                                                {{ $lvl->level_name }}
-                                            </option>
-                                        @endif
-                                    @endforeach
-                                </select>
+                                @if((int) Auth::user()->level_id === 1)
+                                    <select name="level_id" class="form-select" required>
+                                        <option value="">Select Level</option>
+                                        @foreach($userLevels as $lvl)
+                                            @if($lvl->level_name !== 'Administrator')
+                                                <option value="{{ $lvl->level_id }}" {{ old('level_id', $user->level_id) == $lvl->level_id ? 'selected' : '' }}>
+                                                    {{ $lvl->level_name }}
+                                                </option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                @else
+                                    <select name="level_id_disabled" class="form-select bg-light" disabled>
+                                        @foreach($userLevels as $lvl)
+                                            @if($lvl->level_id == $user->level_id)
+                                                <option value="{{ $lvl->level_id }}" selected>
+                                                    {{ $lvl->level_name }}
+                                                </option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                    <input type="hidden" name="level_id" value="{{ $user->level_id }}">
+                                @endif
                             </div>
 
                             <div class="col-md-6">

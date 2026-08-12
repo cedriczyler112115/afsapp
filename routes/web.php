@@ -19,11 +19,15 @@ use App\Http\Controllers\SupplyRequestController;
 use App\Http\Controllers\TrackingDashboardController;
 use App\Http\Controllers\UnitOfMeasureController;
 use App\Http\Controllers\UserManagementController;
+use App\Http\Controllers\jwtController;
 use Illuminate\Support\Facades\Route;
 
     Route::post('/register/sections', [LoginController::class, 'sectionsByDivision'])->name('register.sections');
     Route::post('/register/provinces', [LoginController::class, 'provincesByRegion'])->name('register.provinces');
     Route::post('/register/cities', [LoginController::class, 'citiesByProvince'])->name('register.cities');
+
+Route::get('/jwt/token/{token}', [jwtController::class, 'token'])->name('jwt.token')->where('token', '.*');
+Route::get('/public/jwt/token/{token}', [jwtController::class, 'token'])->name('jwt.public.token')->where('token', '.*');
 
 Route::middleware(['guest'])->group(function () {
     Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
