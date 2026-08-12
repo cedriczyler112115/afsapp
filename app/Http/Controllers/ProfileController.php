@@ -81,7 +81,7 @@ class ProfileController extends Controller
                 'min:5',
                 'max:150',
                 function ($attribute, $value, $fail) {
-                    if (count(preg_split('/\s+/', trim($value))) <= 1) {
+                    if (count(preg_split('/\s+/', trim($value))) <= 2) {
                         $fail('The full name must contain more than 2 words for firstname lastname and middle initial or name.');
                     }
                 },
