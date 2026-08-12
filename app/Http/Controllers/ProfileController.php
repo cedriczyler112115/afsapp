@@ -80,7 +80,11 @@ class ProfileController extends Controller
         $validated = $request->validate([
             'name' => [
                 'required', 'string', 'min:5', 'max:150',
-                'regex:/^[\pL][\pL\s.\'-]{1,74},\s*[\pL][\pL\s.\'-]{1,74}$/u',
+                function ($attribute, $value, $fail) {
+                    if (count(preg_split('/\s+/', trim($value))) <= 2) {
+                        $fail('The full name must contain more than 2 words.');
+                    }
+                },
             ],
             'level_id' => ['required', 'integer', Rule::exists('user_level', 'id')],
             'division_id' => ['required', 'integer', Rule::exists('lib_division', 'id')],
@@ -106,8 +110,6 @@ class ProfileController extends Controller
                     $q->where('prov_code', $request->input('province_code'));
                 }),
             ],
-        ], [
-            'name.regex' => 'Name format must be: lastname, firstname middlename.'
         ]);
 
         $user->update([
